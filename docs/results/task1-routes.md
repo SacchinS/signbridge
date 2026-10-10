@@ -6,7 +6,7 @@ Script: `spike_routes.py`. Measured 2026-10-09.
 macOS version / chip: macOS 26.2 (25C56) / Apple silicon (arm64)
 Siri route: pending
 Text route: pending
-Voice route: pending
+Voice route: 5/5 (macOS Dictation, BlackHole as mic), Voice Control works: not yet tested
 Haiku 5.5 median latency / valid output rate: 1.08 s to tool call (1.82 s full turn) / 20/20
 Surprises:
 Recommended cut or fallback:
@@ -26,4 +26,8 @@ Recommended cut or fallback:
 
 - BlackHole 2ch 0.7.1 installed via Homebrew on macOS 26.2. The cask's installer needs sudo, so it has to be run from a real terminal.
 - Loopback check: `say -a "BlackHole 2ch" "Hello everyone, I am ready to start."` while recording the BlackHole input with ffmpeg (avfoundation device `:1`). Recorded audio peaks at -3.6 dB with a -23.0 dB mean (silence is about -90 dB), so audio reaches the virtual mic.
-- Transcription by a real app: pending.
+- Transcription by a real app: macOS Dictation (Keyboard > Dictation, microphone set to BlackHole 2ch) in a Notes note.
+  `python spike_routes.py voice --runs 5 --delay 10 --gap 2`, dictation started by hand. 5/5 sentences transcribed word for word
+  ("Hello everyone, I am ready to start."); only the comma after "Hello everyone" varied (present in 1 of 5).
+- Dictation has to be started by the user (mic button or shortcut); it does not listen continuously. Voice Control does, but needs its own mic setting.
+- Voice Control ("Open Safari"): not yet tested.
