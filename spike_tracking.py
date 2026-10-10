@@ -23,6 +23,7 @@ import mediapipe as mp
 from mediapipe.tasks.python import BaseOptions, vision
 
 MODEL_PATH = "models/holistic_landmarker.task"
+WINDOW = "signbridge tracking (q to quit)"
 HAND_MODEL_PATH = "models/hand_landmarker.task"
 POSE_MODEL_PATH = "models/pose_landmarker_lite.task"
 
@@ -131,6 +132,7 @@ def main():
     p.add_argument("--height", type=int, default=720)
     p.add_argument("--delegate", choices=["cpu", "gpu"], default="cpu")
     p.add_argument("--mode", choices=["holistic", "split"], default="holistic", help="split = hands + pose, no face")
+    p.add_argument("--warmup", type=float, default=10, help="seconds of preview before measuring (needs --show)")
     p.add_argument("--show", action="store_true", help="show a preview window with landmarks")
     p.add_argument("--out", help="write the summary as JSON to this path")
     args = p.parse_args()
@@ -148,6 +150,19 @@ def main():
     landmarker = SplitLandmarker(args.delegate) if args.mode == "split" else make_landmarker(args.delegate)
     grabber = LatestFrame(cap)
     seq = 0
+    if args.show and args.warmup > 0:
+        print(f"Get into position: {args.warmup:.0f}s before measuring starts.", flush=True)
+        end = time.perf_counter() + args.warmup
+        while time.perf_counter() < end:
+            seq, frame = grabber.read(seq)
+            if frame is None:
+                continue
+            frame = cv2.flip(frame, 1)
+            left = int(end - time.perf_counter()) + 1
+            cv2.putText(frame, f"Get in position: {left}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+            cv2.imshow(WINDOW, frame)
+            cv2.waitKey(1)
+        print("Measuring now.", flush=True)
     frames = any_hand = both_hands = pose = 0
     infer_ms, stamps = [], []
     start = time.perf_counter()
@@ -178,7 +193,7 @@ def main():
 
         if args.show:
             draw(frame, result)
-            cv2.imshow("signbridge tracking (q to quit)", frame)
+            cv2.imshow(WINDOW, cv2.flip(frame, 1))
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
         if stamps[-1] - last_print >= 5:
