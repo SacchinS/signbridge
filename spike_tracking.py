@@ -41,6 +41,22 @@ def make_landmarker(delegate="cpu"):
     return vision.HolisticLandmarker.create_from_options(options)
 
 
+POSE_WRISTS = (15, 16)
+
+
+def visible_wrists(pose_landmarks, min_visibility=0.5, margin=0.02):
+    """Count wrists the pose model sees inside the image, i.e. hands that should be detectable."""
+    if not pose_landmarks:
+        return 0
+    count = 0
+    for i in POSE_WRISTS:
+        lm = pose_landmarks[i]
+        inside = margin <= lm.x <= 1 - margin and margin <= lm.y <= 1 - margin
+        if inside and (lm.visibility is None or lm.visibility >= min_visibility):
+            count += 1
+    return count
+
+
 class LatestFrame:
     """Reads the camera on a background thread and keeps only the newest frame.
 
@@ -132,8 +148,8 @@ def main():
     p.add_argument("--height", type=int, default=720)
     p.add_argument("--delegate", choices=["cpu", "gpu"], default="cpu")
     p.add_argument("--mode", choices=["holistic", "split"], default="holistic", help="split = hands + pose, no face")
-    p.add_argument("--warmup", type=float, default=10, help="seconds of preview before measuring (needs --show)")
-    p.add_argument("--show", action="store_true", help="show a preview window with landmarks")
+    p.add_argument("--warmup", type=float, default=10, help="seconds of positioning preview before measuring (0 = none)")
+    p.add_argument("--show", action="store_true", help="keep the preview window open while measuring (costs fps)")
     p.add_argument("--out", help="write the summary as JSON to this path")
     args = p.parse_args()
 
@@ -150,7 +166,7 @@ def main():
     landmarker = SplitLandmarker(args.delegate) if args.mode == "split" else make_landmarker(args.delegate)
     grabber = LatestFrame(cap)
     seq = 0
-    if args.show and args.warmup > 0:
+    if args.warmup > 0:
         print(f"Get into position: {args.warmup:.0f}s before measuring starts.", flush=True)
         end = time.perf_counter() + args.warmup
         while time.perf_counter() < end:
@@ -162,9 +178,13 @@ def main():
             cv2.putText(frame, f"Get in position: {left}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
             cv2.imshow(WINDOW, frame)
             cv2.waitKey(1)
-        print("Measuring now.", flush=True)
+        if not args.show:
+            cv2.destroyAllWindows()
+            cv2.waitKey(1)
+        print("Measuring now." + ("" if args.show else " Preview closed; keep signing in the same spot."), flush=True)
     frames = any_hand = both_hands = pose = 0
-    infer_ms, stamps = [], []
+    infer_ms, loop_ms, stamps = [], [], []
+    wrists_visible = hands_matched = 0
     start = time.perf_counter()
     last_ts = -1
     last_print = start
@@ -175,6 +195,7 @@ def main():
         seq, frame = grabber.read(seq)
         if frame is None:
             continue
+        t_loop = time.perf_counter()
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         ts = max(int((now - start) * 1000), last_ts + 1)
@@ -190,12 +211,16 @@ def main():
         any_hand += left or right
         both_hands += left and right
         pose += bool(result.pose_landmarks)
+        visible = visible_wrists(result.pose_landmarks)
+        wrists_visible += visible
+        hands_matched += min(visible, left + right)
 
         if args.show:
             draw(frame, result)
             cv2.imshow(WINDOW, cv2.flip(frame, 1))
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
+        loop_ms.append((time.perf_counter() - t_loop) * 1000)
         if stamps[-1] - last_print >= 5:
             last_print = stamps[-1]
             recent = [s for s in stamps if s >= last_print - 5]
@@ -215,6 +240,8 @@ def main():
         "fps_min_1s": min(full_secs) if full_secs else None,
         "infer_ms_median": round(statistics.median(infer_ms), 1) if infer_ms else None,
         "infer_ms_p95": round(sorted(infer_ms)[int(len(infer_ms) * 0.95)], 1) if infer_ms else None,
+        "loop_ms_median": round(statistics.median(loop_ms), 1) if loop_ms else None,
+        "hand_recall_visible_wrists": round(hands_matched / wrists_visible, 3) if wrists_visible else None,
         "any_hand_rate": round(any_hand / frames, 3) if frames else 0,
         "both_hands_rate": round(both_hands / frames, 3) if frames else 0,
         "pose_rate": round(pose / frames, 3) if frames else 0,
