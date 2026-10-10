@@ -4,7 +4,7 @@ Script: `spike_routes.py`. Measured 2026-10-09.
 
 ```
 macOS version / chip: macOS 26.2 (25C56) / Apple silicon (arm64)
-Siri route: pending
+Siri route: 10/10 (macOS 26 Type to Siri, hold Cmd-Space), clipboard restored 10/10
 Text route: pending
 Voice route: 5/5 (macOS Dictation, BlackHole as mic), Voice Control works: not yet tested
 Haiku 5.5 median latency / valid output rate: 1.08 s to tool call (1.82 s full turn) / 20/20
@@ -31,3 +31,11 @@ Recommended cut or fallback:
   ("Hello everyone, I am ready to start."); only the comma after "Hello everyone" varied (present in 1 of 5).
 - Dictation has to be started by the user (mic button or shortcut); it does not listen continuously. Voice Control does, but needs its own mic setting.
 - Voice Control ("Open Safari"): not yet tested.
+
+## Siri route (`python spike_routes.py siri --delay 3`)
+
+- macOS 26 flow: Siri keyboard shortcut set to "Hold Command Space", Type to Siri on (System Settings > Accessibility > Siri).
+- The script holds Cmd-Space for 0.8 s with real Command key down/up events, waits 0.4 s, pastes "What is the weather tomorrow?", presses Return, waits 8 s, then presses Escape.
+- 10/10 runs ended with Siri answering (observed by the user). `clipboard restored=True` on all 10.
+- First attempt failed: Type to Siri was off, so holding the shortcut opened voice Siri and the paste went nowhere. The app must check for this setting or tell the user to enable it.
+- The Cmd-Space plus Spotlight flow from the handoff applies only to macOS 27 and was not tested.
