@@ -124,7 +124,7 @@ class IntentClient:
 
 # ---------- keystrokes and clipboard ----------
 
-KEY_V, KEY_SPACE, KEY_RETURN = 9, 49, 36
+KEY_V, KEY_SPACE, KEY_RETURN, KEY_ESCAPE = 9, 49, 36, 53
 
 
 def post_key(keycode, flags=0):
@@ -168,21 +168,35 @@ def route_text(sentence):
     return paste_text(sentence)
 
 
-def route_siri(sentence, open_delay=0.4):
+def route_siri(sentence, open_delay=0.4, hold=0.8):
     """macOS 26 flow: open Type to Siri with its keyboard shortcut, paste, Return.
 
-    Assumes Type to Siri is on and its shortcut is "Press Cmd-Space" style;
-    adjust open_siri() once the actual shortcut on this Mac is known.
+    Assumes Type to Siri is on and the Siri shortcut is "Hold Command Space".
     """
-    open_siri()
+    open_siri(hold)
     time.sleep(open_delay)
     restored = paste_text(sentence)
     post_key(KEY_RETURN)
     return restored
 
 
-def open_siri():
-    post_key(KEY_SPACE, Quartz.kCGEventFlagMaskCommand)
+KEY_COMMAND = 55
+
+
+def open_siri(hold):
+    """Hold Cmd-Space for `hold` seconds, sending real modifier key events."""
+    cmd = Quartz.kCGEventFlagMaskCommand
+    for keycode, down, flags in ((KEY_COMMAND, True, cmd), (KEY_SPACE, True, cmd)):
+        event = Quartz.CGEventCreateKeyboardEvent(None, keycode, down)
+        Quartz.CGEventSetFlags(event, flags)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
+        time.sleep(0.02)
+    time.sleep(hold)
+    for keycode, down, flags in ((KEY_SPACE, False, cmd), (KEY_COMMAND, False, 0)):
+        event = Quartz.CGEventCreateKeyboardEvent(None, keycode, down)
+        Quartz.CGEventSetFlags(event, flags)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
+        time.sleep(0.02)
 
 
 def route_voice(sentence, device="BlackHole 2ch"):
@@ -227,8 +241,7 @@ def cmd_route(args):
         "voice": "Hello everyone, I am ready to start.",
     }
     sentence = args.sentence or sentences[args.route]
-    if args.route == "text":
-        countdown("Text route: click into the text field", args.delay)
+    countdown(f"{args.route} route", args.delay)
     for i in range(args.runs):
         if args.route == "text":
             restored = route_text(sentence + (f" ({i + 1})" if args.runs > 1 else ""))
@@ -237,12 +250,14 @@ def cmd_route(args):
             print(f"run {i + 1}: pasted, clipboard restored={restored}")
             time.sleep(0.5)
         elif args.route == "siri":
-            input(f"run {i + 1}: press Enter to fire the Siri route...")
-            restored = route_siri(sentence)
-            print(f"  fired, clipboard restored={restored}. Did Siri answer? (record y/n)")
+            restored = route_siri(sentence, hold=args.hold)
+            print(f"run {i + 1}: fired, clipboard restored={restored}. Did Siri answer?", flush=True)
+            time.sleep(args.gap)
+            post_key(KEY_ESCAPE)  # dismiss Siri before the next run
+            time.sleep(1)
         else:
-            input(f"run {i + 1}: press Enter to speak into BlackHole...")
-            print(f"  say exit ok={route_voice(sentence)}")
+            print(f"run {i + 1}: say exit ok={route_voice(sentence)}", flush=True)
+            time.sleep(args.gap)
 
 
 async def cmd_interactive(args):
@@ -282,6 +297,8 @@ def main():
         r.add_argument("--sentence")
         r.add_argument("--delay", type=int, default=5)
         r.add_argument("--newline", action="store_true", help="press Return after each paste")
+        r.add_argument("--hold", type=float, default=0.8, help="seconds to hold the Siri shortcut")
+        r.add_argument("--gap", type=float, default=8, help="seconds to wait between Siri/voice runs")
         r.set_defaults(route=name)
     i = sub.add_parser("interactive")
     i.add_argument("--model", default=PRIMARY_MODEL)
