@@ -16,14 +16,17 @@ A distinct two-part wake-sign with a timeout gates recognition, so random hand m
 
 ## How to run
 
-Requirements: Apple silicon Mac, Python 3.11+, Camera and Accessibility permission for your terminal.
+Requirements: Apple silicon Mac, Python 3.12 via [uv](https://docs.astral.sh/uv/), Claude Code logged in, Camera and Accessibility permission for your terminal.
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-pip install mediapipe opencv-python pyobjc rumps anthropic torch numpy
-cp .env.example .env   # then set ANTHROPIC_API_KEY in your shell
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python claude-agent-sdk pyobjc-core pyobjc-framework-Quartz \
+  pyobjc-framework-Cocoa pyobjc-framework-ApplicationServices
 ```
+
+The intent layer calls Claude through the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/), which uses your local Claude Code login, so no API key is needed for testing. Task 2 adds `mediapipe opencv-python torch numpy rumps`.
 
 Spike scripts live at the repo root; each has a header comment explaining how to run it.
 
