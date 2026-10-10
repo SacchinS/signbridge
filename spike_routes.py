@@ -250,10 +250,11 @@ def cmd_route(args):
             print(f"run {i + 1}: pasted, clipboard restored={restored}")
             time.sleep(0.5)
         elif args.route == "siri":
-            restored = route_siri(sentence, hold=args.hold)
+            restored = route_siri(sentence, open_delay=args.open_delay, hold=args.hold)
             print(f"run {i + 1}: fired, clipboard restored={restored}. Did Siri answer?", flush=True)
             time.sleep(args.gap)
-            post_key(KEY_ESCAPE)  # dismiss Siri before the next run
+            if not args.no_dismiss:
+                post_key(KEY_ESCAPE)  # dismiss Siri before the next run
             time.sleep(1)
         else:
             print(f"run {i + 1}: say exit ok={route_voice(sentence)}", flush=True)
@@ -298,6 +299,8 @@ def main():
         r.add_argument("--delay", type=int, default=5)
         r.add_argument("--newline", action="store_true", help="press Return after each paste")
         r.add_argument("--hold", type=float, default=0.8, help="seconds to hold the Siri shortcut")
+        r.add_argument("--open-delay", type=float, default=0.4, help="seconds between opening Siri and pasting")
+        r.add_argument("--no-dismiss", action="store_true", help="leave Siri open after each run")
         r.add_argument("--gap", type=float, default=8, help="seconds to wait between Siri/voice runs")
         r.set_defaults(route=name)
     i = sub.add_parser("interactive")
