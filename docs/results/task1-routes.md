@@ -5,11 +5,15 @@ Script: `spike_routes.py`. Measured 2026-10-09.
 ```
 macOS version / chip: macOS 26.2 (25C56) / Apple silicon (arm64)
 Siri route: 10/10 (macOS 26 Type to Siri, hold Cmd-Space), clipboard restored 10/10
-Text route: pending
+Text route: Notes 10/10, Messages 10/10, Browser 10/10
 Voice route: 5/5 (macOS Dictation, BlackHole as mic), Voice Control works: not yet tested
 Haiku 5.5 median latency / valid output rate: 1.08 s to tool call (1.82 s full turn) / 20/20
-Surprises:
-Recommended cut or fallback:
+Surprises: Haiku 5.5 runs fine on a Claude Pro login via the Agent SDK, but a cold query() takes 7.2 s,
+  so a persistent client is required. Type to Siri must be on or the Siri route silently fails.
+  Dictation only listens after it is started by hand. Voice Control was not tested.
+Recommended cut or fallback: no cuts. All four gates pass. Keep the persistent SDK client; decide on
+  API key vs subscription before the demo build. Voice route via Dictation needs a manual start, so
+  for a hands-free demo test Voice Control or a voice-chat app with BlackHole as its mic.
 ```
 
 ## Intent latency (`python spike_routes.py bench --runs 20`)
@@ -39,3 +43,9 @@ Recommended cut or fallback:
 - 10/10 runs ended with Siri answering (observed by the user). `clipboard restored=True` on all 10.
 - First attempt failed: Type to Siri was off, so holding the shortcut opened voice Siri and the paste went nowhere. The app must check for this setting or tell the user to enable it.
 - The Cmd-Space plus Spotlight flow from the handoff applies only to macOS 27 and was not tested.
+
+## Text route (`python spike_routes.py text --delay 8`)
+
+- Pasteboard + CGEvent Cmd-V, 10 numbered pastes per app into the focused field, no Return pressed.
+- Notes 10/10, Messages compose box 10/10, browser text field 10/10 (observed by the user).
+- `clipboard restored=True` on all 10 Notes runs (confirmed by the user). The user reported Messages and the browser working, but did not report the restore flag for them separately.

@@ -33,7 +33,7 @@ Spike scripts live at the repo root; each has a header comment explaining how to
 ## Status
 
 - [x] Task 0: repository setup
-- [ ] Task 1: output-route spike (Siri, text paste, voice) with no ML
+- [x] Task 1: output-route spike. Siri 10/10, text 30/30, voice 5/5, Haiku 5.5 median 1.08 s ([results](docs/results/task1-routes.md))
 - [ ] Task 2: tracking speed and 5-sign pilot
 
 Measured results are recorded in [`docs/results/`](docs/results/). The original build plan is in [`docs/HANDOFF.md`](docs/HANDOFF.md).
