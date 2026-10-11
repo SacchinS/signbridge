@@ -1,0 +1,142 @@
+"""Task 2 step 2: record sign takes as landmarks only (no video is saved).
+
+Each take is a fixed window of frames. The preview shows a countdown, then
+"SIGN NOW" while recording. Saved per take, under data/landmarks/<SIGN>/:
+    <signer>_<session>_<date>_<take>.npz with
+    pose  (T, 33, 4)  x, y, z, visibility
+    left  (T, 21, 3)  NaN when the hand is not found
+    right (T, 21, 3)  NaN when the hand is not found
+    t     (T,)        seconds since the take started
+Face landmarks are not saved.
+
+Run (from the repo root, inside .venv):
+    python record_signs.py --sign HELLO --session s1 [--takes 10] [--seconds 2.0] [--signer me]
+
+Keys in the preview window: x = discard the last saved take, q = stop early.
+Hold out whole sessions for testing, so record each session on a different
+sitting (different time, lighting or clothes).
+"""
+
+import argparse
+import datetime
+import os
+import time
+
+import cv2
+import mediapipe as mp
+import numpy as np
+
+from spike_tracking import WINDOW, LatestFrame, draw, make_landmarker
+
+DATA_DIR = "data/landmarks"
+
+
+def to_arrays(result):
+    pose = np.full((33, 4), np.nan, dtype=np.float32)
+    if result.pose_landmarks:
+        pose[:] = [(lm.x, lm.y, lm.z, lm.visibility if lm.visibility is not None else np.nan) for lm in result.pose_landmarks]
+    hands = []
+    for lms in (result.left_hand_landmarks, result.right_hand_landmarks):
+        arr = np.full((21, 3), np.nan, dtype=np.float32)
+        if lms:
+            arr[:] = [(lm.x, lm.y, lm.z) for lm in lms]
+        hands.append(arr)
+    return pose, hands[0], hands[1]
+
+
+def banner(frame, text, color):
+    cv2.putText(frame, text, (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.6, color, 4)
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--sign", required=True, help="gloss label, e.g. HELLO")
+    p.add_argument("--session", required=True, help="session id, e.g. s1; one sitting per session")
+    p.add_argument("--signer", default="me")
+    p.add_argument("--takes", type=int, default=10)
+    p.add_argument("--seconds", type=float, default=2.0, help="length of each recorded take")
+    p.add_argument("--rest", type=float, default=2.0, help="countdown before each take")
+    p.add_argument("--camera", type=int, default=0)
+    args = p.parse_args()
+
+    sign = args.sign.upper()
+    out_dir = os.path.join(DATA_DIR, sign)
+    os.makedirs(out_dir, exist_ok=True)
+    date = datetime.date.today().isoformat()
+
+    cap = cv2.VideoCapture(args.camera)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    if not cap.isOpened():
+        raise SystemExit("Could not open the camera.")
+    grabber = LatestFrame(cap)
+    landmarker = make_landmarker()
+    clock = time.perf_counter()
+    last_ts = -1
+    seq = 0
+    saved = []
+
+    def step(label, color):
+        """Track one new frame, show it with a banner; returns (result, key)."""
+        nonlocal seq, last_ts
+        seq, frame = grabber.read(seq)
+        if frame is None:
+            return None, -1
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        ts = max(int((time.perf_counter() - clock) * 1000), last_ts + 1)
+        last_ts = ts
+        result = landmarker.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb), ts)
+        draw(frame, result)
+        frame = cv2.flip(frame, 1)
+        banner(frame, label, color)
+        cv2.putText(frame, f"{sign}  take {len(saved) + 1}/{args.takes}", (20, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.imshow(WINDOW, frame)
+        return result, cv2.waitKey(1) & 0xFF
+
+    print(f"Recording {sign}, session {args.session}: {args.takes} takes of {args.seconds}s. Keys: x = discard last, q = quit.")
+    quit_early = False
+    while len(saved) < args.takes and not quit_early:
+        end = time.perf_counter() + args.rest
+        while time.perf_counter() < end:
+            _, key = step(f"Ready... {int(end - time.perf_counter()) + 1}", (0, 200, 255))
+            if key == ord("q"):
+                quit_early = True
+                break
+            if key == ord("x") and saved:
+                os.remove(saved.pop())
+                print(f"  discarded take, {len(saved)} kept")
+                end = time.perf_counter() + args.rest
+        if quit_early:
+            break
+
+        poses, lefts, rights, ts_list = [], [], [], []
+        t0 = time.perf_counter()
+        while time.perf_counter() - t0 < args.seconds:
+            result, _ = step(f"SIGN {sign} NOW", (0, 0, 255))
+            if result is None:
+                continue
+            pose, left, right = to_arrays(result)
+            poses.append(pose)
+            lefts.append(left)
+            rights.append(right)
+            ts_list.append(time.perf_counter() - t0)
+
+        take = len(saved) + 1
+        path = os.path.join(out_dir, f"{args.signer}_{args.session}_{date}_{take:02d}.npz")
+        while os.path.exists(path):
+            take += 1
+            path = os.path.join(out_dir, f"{args.signer}_{args.session}_{date}_{take:02d}.npz")
+        np.savez_compressed(path, pose=np.stack(poses), left=np.stack(lefts), right=np.stack(rights), t=np.array(ts_list, dtype=np.float32))
+        saved.append(path)
+        hands = np.mean([not (np.isnan(l).all() and np.isnan(r).all()) for l, r in zip(lefts, rights)])
+        print(f"  saved {os.path.basename(path)}: {len(poses)} frames, hand found in {hands:.0%}")
+
+    landmarker.close()
+    grabber.stop()
+    cap.release()
+    cv2.destroyAllWindows()
+    print(f"Done: {len(saved)} takes in {out_dir}")
+
+
+if __name__ == "__main__":
+    main()
