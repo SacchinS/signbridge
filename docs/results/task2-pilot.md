@@ -25,3 +25,10 @@ from reference videos). Recorder: `record_signs.py`, 2 s takes, landmarks only.
 32 resampled frames x 197 features (upper-body pose + both hands, shoulder-normalized, plus hand-missing flags).
 15/15 correct. This only shows the pipeline works; same-session splits overstate accuracy. The real number
 comes from leave-one-session-out once sessions 2-4 are recorded.
+
+## Informal live check (`live_classify.py`, model trained on all of session 1)
+
+New sitting, free-form: the user signed each of the 5 signs once. Guesses: THANK-YOU 98%, HELLO 86%,
+NO 99%, HELP 97%, YES 96%, all reported correct by the user. Five tries with no logged ground truth, so this
+is a gut check, not the pilot accuracy. The scored number still needs a held-out session
+(`record_signs.py --session s2 --model models/pilot.pt`).
