@@ -107,12 +107,14 @@ class TinyConv(nn.Module):
         return self.net(x.transpose(1, 2))
 
 
-def train(x_train, y_train, n_classes, epochs, seed):
+def train(x_train, y_train, n_classes, epochs, seed, model=None, lr=3e-3):
+    """Train a new TinyConv, or keep training `model` (for fine-tuning)."""
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    model = TinyConv(x_train.shape[2], n_classes)
-    opt = torch.optim.AdamW(model.parameters(), lr=3e-3, weight_decay=1e-3)
+    if model is None:
+        model = TinyConv(x_train.shape[2], n_classes)
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-3)
     loss_fn = nn.CrossEntropyLoss()
     for _ in range(epochs):
         model.train()

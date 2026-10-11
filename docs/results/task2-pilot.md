@@ -64,5 +64,9 @@ Confusion pairs (true -> predicted): YES -> NO x2, HELLO -> THANK-YOU x1.
 
 - One signer, who is the person the model is tested on, and not a fluent ASL signer. This says nothing
   about other signers; reported unseen-signer ceilings are 63-84%.
+- **Seed variance (found 2026-10-10 during the PopSign check):** the 97% above is seed 0. The same
+  evaluation with seeds 1 and 2 gives 79% and 93%, so **about 90% mean** is the honest number. With 20 takes
+  per sign, training on my data alone is unstable. PopSign pretraining fixes this; see
+  [popsign.md](../research/popsign.md).
 - Two sessions, both on 2026-10-10. 20 takes per sign, short of the 40+ target; sessions 3-4 pending.
 - Takes are pre-segmented 2 s windows. No "not a sign" class yet, so the model always picks one of the 5.
