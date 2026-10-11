@@ -11,10 +11,15 @@ Face landmarks are not saved.
 
 Run (from the repo root, inside .venv):
     python record_signs.py --session s1 [--signs HELLO YES NO THANK-YOU HELP] [--takes 10] [--seconds 2.0]
+    python record_signs.py --session s2 --model models/pilot.pt   # also classify each take live
 
 Signs are recorded one after another; the preview waits for Space before each
 new sign. Keys: Space = start the next sign, x = discard the last saved take,
 q = stop early.
+
+With --model, each take is also classified right after it is saved, the guess is
+shown in the preview, and per-sign accuracy is printed at the end. Recording a
+new session this way doubles as a live held-out test.
 Hold out whole sessions for testing, so record each session on a different
 sitting (different time, lighting or clothes).
 """
@@ -47,6 +52,28 @@ def to_arrays(result):
     return pose, hands[0], hands[1]
 
 
+class Classifier:
+    def __init__(self, path):
+        import torch
+
+        from train_pilot import TinyConv
+
+        self.torch = torch
+        ckpt = torch.load(path, weights_only=False)
+        self.signs, self.frames = ckpt["signs"], ckpt["frames"]
+        self.model = TinyConv(ckpt["features"], len(self.signs))
+        self.model.load_state_dict(ckpt["state_dict"])
+        self.model.eval()
+
+    def predict(self, take):
+        from train_pilot import featurize
+
+        x = self.torch.from_numpy(featurize(take, self.frames)[None])
+        with self.torch.no_grad():
+            probs = self.torch.softmax(self.model(x), 1)[0].numpy()
+        return self.signs[int(probs.argmax())], float(probs.max())
+
+
 def banner(frame, text, color):
     cv2.putText(frame, text, (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.6, color, 4)
 
@@ -60,9 +87,14 @@ def main():
     p.add_argument("--seconds", type=float, default=2.0, help="length of each recorded take")
     p.add_argument("--rest", type=float, default=2.0, help="countdown before each take")
     p.add_argument("--camera", type=int, default=0)
+    p.add_argument("--model", help="classify each take with this trained model (from train_pilot.py --save)")
     args = p.parse_args()
 
     date = datetime.date.today().isoformat()
+
+    classifier = Classifier(args.model) if args.model else None
+    live_true, live_pred = [], []
+    last_guess = ""
 
     cap = cv2.VideoCapture(args.camera)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -91,6 +123,8 @@ def main():
         frame = cv2.flip(frame, 1)
         banner(frame, label, color)
         cv2.putText(frame, f"{sign}  take {min(len(saved) + 1, args.takes)}/{args.takes}", (20, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        if last_guess:
+            cv2.putText(frame, last_guess, (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 3)
         cv2.imshow(WINDOW, frame)
         return result, cv2.waitKey(1) & 0xFF
 
@@ -145,13 +179,27 @@ def main():
             np.savez_compressed(path, pose=np.stack(poses), left=np.stack(lefts), right=np.stack(rights), t=np.array(ts_list, dtype=np.float32))
             saved.append(path)
             hands = np.mean([not (np.isnan(l).all() and np.isnan(r).all()) for l, r in zip(lefts, rights)])
-            print(f"  {sign}: saved {os.path.basename(path)}: {len(poses)} frames, hand found in {hands:.0%}")
+            guess = ""
+            if classifier:
+                take_data = {"pose": np.stack(poses), "left": np.stack(lefts), "right": np.stack(rights), "t": np.array(ts_list)}
+                label, prob = classifier.predict(take_data)
+                mark = "OK" if label == sign else "WRONG"
+                last_guess = f"Model: {label} ({prob:.0%}) {mark}"
+                guess = f", model says {label} ({prob:.0%}) {mark}"
+                if sign in classifier.signs:
+                    live_true.append(classifier.signs.index(sign))
+                    live_pred.append(classifier.signs.index(label))
+            print(f"  {sign}: saved {os.path.basename(path)}: {len(poses)} frames, hand found in {hands:.0%}{guess}")
 
     landmarker.close()
     grabber.stop()
     cap.release()
     cv2.destroyAllWindows()
     print("Session finished.")
+    if live_true:
+        from train_pilot import report
+
+        report(classifier.signs, np.array(live_true), np.array(live_pred), f"live test, session {args.session}")
 
 
 if __name__ == "__main__":
