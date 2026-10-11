@@ -149,7 +149,7 @@ def main():
     p.add_argument("--delegate", choices=["cpu", "gpu"], default="cpu")
     p.add_argument("--mode", choices=["holistic", "split"], default="holistic", help="split = hands + pose, no face")
     p.add_argument("--warmup", type=float, default=10, help="seconds of positioning preview before measuring (0 = none)")
-    p.add_argument("--show", action="store_true", help="keep the preview window open while measuring (costs fps)")
+    p.add_argument("--show", action="store_true", help="keep the preview window open while measuring (runs on the main thread, separate from tracking)")
     p.add_argument("--out", help="write the summary as JSON to this path")
     args = p.parse_args()
 
@@ -185,46 +185,70 @@ def main():
     frames = any_hand = both_hands = pose = 0
     infer_ms, loop_ms, stamps = [], [], []
     wrists_visible = hands_matched = 0
+    latest = {"result": None}
+    stop = threading.Event()
     start = time.perf_counter()
-    last_ts = -1
-    last_print = start
-    while True:
-        now = time.perf_counter()
-        if now - start >= args.seconds:
-            break
-        seq, frame = grabber.read(seq)
+
+    def track():
+        # Runs on its own thread so the preview never slows tracking down.
+        nonlocal seq, frames, any_hand, both_hands, pose, wrists_visible, hands_matched
+        last_ts = -1
+        last_print = start
+        while not stop.is_set():
+            now = time.perf_counter()
+            if now - start >= args.seconds:
+                break
+            seq, frame = grabber.read(seq)
+            if frame is None:
+                continue
+            t_loop = time.perf_counter()
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            ts = max(int((now - start) * 1000), last_ts + 1)
+            last_ts = ts
+            t0 = time.perf_counter()
+            result = landmarker.detect_for_video(image, ts)
+            infer_ms.append((time.perf_counter() - t0) * 1000)
+            stamps.append(time.perf_counter())
+            latest["result"] = result
+
+            left = bool(result.left_hand_landmarks)
+            right = bool(result.right_hand_landmarks)
+            frames += 1
+            any_hand += left or right
+            both_hands += left and right
+            pose += bool(result.pose_landmarks)
+            visible = visible_wrists(result.pose_landmarks)
+            wrists_visible += visible
+            hands_matched += min(visible, left + right)
+
+            loop_ms.append((time.perf_counter() - t_loop) * 1000)
+            if stamps[-1] - last_print >= 5:
+                last_print = stamps[-1]
+                recent = [s for s in stamps if s >= last_print - 5]
+                recall = hands_matched / wrists_visible if wrists_visible else 0
+                print(f"{last_print - start:5.0f}s  fps={len(recent) / 5:5.1f}  any hand={any_hand / frames:6.1%}  both={both_hands / frames:6.1%}  recall={recall:6.1%}", flush=True)
+
+    tracker = threading.Thread(target=track)
+    tracker.start()
+    # cv2.imshow must run on the main thread on macOS, so the preview lives here.
+    preview_frames = 0
+    shown_seq = seq
+    while tracker.is_alive():
+        if not args.show:
+            tracker.join(timeout=0.2)
+            continue
+        shown_seq, frame = grabber.read(shown_seq)  # waits for a new camera frame
         if frame is None:
             continue
-        t_loop = time.perf_counter()
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        ts = max(int((now - start) * 1000), last_ts + 1)
-        last_ts = ts
-        t0 = time.perf_counter()
-        result = landmarker.detect_for_video(image, ts)
-        infer_ms.append((time.perf_counter() - t0) * 1000)
-        stamps.append(time.perf_counter())
-
-        left = bool(result.left_hand_landmarks)
-        right = bool(result.right_hand_landmarks)
-        frames += 1
-        any_hand += left or right
-        both_hands += left and right
-        pose += bool(result.pose_landmarks)
-        visible = visible_wrists(result.pose_landmarks)
-        wrists_visible += visible
-        hands_matched += min(visible, left + right)
-
-        if args.show:
-            draw(frame, result)
-            cv2.imshow(WINDOW, cv2.flip(frame, 1))
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-        loop_ms.append((time.perf_counter() - t_loop) * 1000)
-        if stamps[-1] - last_print >= 5:
-            last_print = stamps[-1]
-            recent = [s for s in stamps if s >= last_print - 5]
-            print(f"{last_print - start:5.0f}s  fps={len(recent) / 5:5.1f}  any hand={any_hand / frames:6.1%}  both={both_hands / frames:6.1%}", flush=True)
+        frame = frame.copy()
+        if latest["result"] is not None:
+            draw(frame, latest["result"])
+        cv2.imshow(WINDOW, cv2.flip(frame, 1))
+        preview_frames += 1
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            stop.set()
+    tracker.join()
 
     elapsed = stamps[-1] - start if stamps else 0
     # fps over each 1-second window, to catch dips the overall average hides
@@ -240,6 +264,8 @@ def main():
         "fps_min_1s": min(full_secs) if full_secs else None,
         "infer_ms_median": round(statistics.median(infer_ms), 1) if infer_ms else None,
         "infer_ms_p95": round(sorted(infer_ms)[int(len(infer_ms) * 0.95)], 1) if infer_ms else None,
+        "preview": args.show,
+        "preview_fps": round(preview_frames / (time.perf_counter() - start), 1) if args.show else None,
         "loop_ms_median": round(statistics.median(loop_ms), 1) if loop_ms else None,
         "hand_recall_visible_wrists": round(hands_matched / wrists_visible, 3) if wrists_visible else None,
         "any_hand_rate": round(any_hand / frames, 3) if frames else 0,
