@@ -18,3 +18,10 @@ from reference videos). Recorder: `record_signs.py`, 2 s takes, landmarks only.
 - THANK-YOU starts at the chin; hand detection drops near the face.
 - HELP rests a fist on the other palm; the hands occlude each other and both are found in only 38% of frames.
 - 50 takes = 1.9 MB of landmarks.
+
+## Pipeline sanity check (session 1 only)
+
+`python train_pilot.py --sanity`: random 70/30 split within session 1, TinyConv (2 Conv1D layers, width 64),
+32 resampled frames x 197 features (upper-body pose + both hands, shoulder-normalized, plus hand-missing flags).
+15/15 correct. This only shows the pipeline works; same-session splits overstate accuracy. The real number
+comes from leave-one-session-out once sessions 2-4 are recorded.
