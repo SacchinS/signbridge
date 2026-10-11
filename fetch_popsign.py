@@ -11,6 +11,7 @@ Run (from the repo root, inside .venv):
 import argparse
 import os
 import subprocess
+import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 
@@ -33,8 +34,15 @@ def fetch(path):
         return "cached"
     folder = os.path.dirname(dest)
     os.makedirs(folder, exist_ok=True)
-    subprocess.run([KAGGLE, "competitions", "download", "-c", "asl-signs", "-f", path, "-p", folder, "-q"],
-                   check=True, capture_output=True)
+    for attempt in range(5):  # Kaggle rate-limits bursts of per-file downloads
+        r = subprocess.run([KAGGLE, "competitions", "download", "-c", "asl-signs", "-f", path, "-p", folder, "-q"],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            break
+        time.sleep(2 ** attempt)
+    else:
+        print(f"  failed {path}: {(r.stderr or r.stdout).strip()[-200:]}")
+        return "failed"
     zipped = dest + ".zip"
     if os.path.exists(zipped):
         with zipfile.ZipFile(zipped) as z:
@@ -47,7 +55,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("signs", nargs="+", help="PopSign sign names, lower case (e.g. hello thankyou)")
     p.add_argument("--per-sign", type=int, default=100)
-    p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--workers", type=int, default=4)
     args = p.parse_args()
 
     index = pd.read_csv(os.path.join(OUT_DIR, "train.csv"))
@@ -63,7 +71,8 @@ def main():
 
     with ThreadPoolExecutor(args.workers) as pool:
         results = list(pool.map(fetch, chosen.path))
-    print(f"{results.count('downloaded')} downloaded, {results.count('cached')} already present")
+    print(f"{results.count('downloaded')} downloaded, {results.count('cached')} already present, {results.count('failed')} failed")
+    chosen = chosen[[r != "failed" for r in results]]
     chosen.drop(columns="rank").to_csv(os.path.join(OUT_DIR, "subset.csv"), index=False)
 
 
