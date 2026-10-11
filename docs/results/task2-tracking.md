@@ -43,3 +43,28 @@ Holistic, CPU, threaded capture, preview window on during measurement. Load aver
   detected hands divided by wrists the pose model sees inside the image.
 - With nobody in frame, inference drops to 12-17 ms and the loop runs at the camera's 30 fps, so speed has
   to be measured with a person signing.
+
+## Run 2: 2 minutes, preview on, tracking on its own thread (`--width 640 --height 480 --show --seconds 120`)
+
+Same person, same movements (waving, open/close, counting, hands near face). Holistic, CPU.
+
+| Metric | Result | Gate |
+|---|---|---|
+| tracking fps mean / worst 1 s | 29.8 / 15 | 24+ (pass on mean; one 1-second dip near 90 s) |
+| worst 5 s window | 26.4 fps | |
+| inference median / p95 | 25.4 ms / 26.3 ms | |
+| hand recall on visible wrists | 97.5% | 95%+ (pass) |
+| any hand / both hands | 99.4% / 92.5% | |
+| pose detected | 100% | |
+| preview fps | 30.0 | |
+
+- Tracking is now capped by the camera's 30 fps, not by the model.
+- The demo needs a live preview for judges, so the preview runs on the main thread (required for `cv2.imshow`
+  on macOS) and inference on a worker thread. The preview shows the newest camera frame with the newest landmarks.
+- Inference was 37 ms in run 1 and 25 ms here. Not isolated: likely the preview no longer sharing the inference
+  thread, plus lower background load. Worth re-checking under load before the demo.
+- GPU delegate still crashes; CPU is enough at 640x480.
+
+## Verdict
+
+Gate passes with Holistic on CPU at 640x480 and the preview on. No fallback needed.
