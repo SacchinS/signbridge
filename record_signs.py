@@ -10,9 +10,11 @@ Each take is a fixed window of frames. The preview shows a countdown, then
 Face landmarks are not saved.
 
 Run (from the repo root, inside .venv):
-    python record_signs.py --sign HELLO --session s1 [--takes 10] [--seconds 2.0] [--signer me]
+    python record_signs.py --session s1 [--signs HELLO YES NO THANK-YOU HELP] [--takes 10] [--seconds 2.0]
 
-Keys in the preview window: x = discard the last saved take, q = stop early.
+Signs are recorded one after another; the preview waits for Space before each
+new sign. Keys: Space = start the next sign, x = discard the last saved take,
+q = stop early.
 Hold out whole sessions for testing, so record each session on a different
 sitting (different time, lighting or clothes).
 """
@@ -29,6 +31,7 @@ import numpy as np
 from spike_tracking import WINDOW, LatestFrame, draw, make_landmarker
 
 DATA_DIR = "data/landmarks"
+PILOT_SIGNS = ["HELLO", "YES", "NO", "THANK-YOU", "HELP"]
 
 
 def to_arrays(result):
@@ -50,7 +53,7 @@ def banner(frame, text, color):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--sign", required=True, help="gloss label, e.g. HELLO")
+    p.add_argument("--signs", nargs="+", default=PILOT_SIGNS, help="gloss labels to record, in order")
     p.add_argument("--session", required=True, help="session id, e.g. s1; one sitting per session")
     p.add_argument("--signer", default="me")
     p.add_argument("--takes", type=int, default=10)
@@ -59,9 +62,6 @@ def main():
     p.add_argument("--camera", type=int, default=0)
     args = p.parse_args()
 
-    sign = args.sign.upper()
-    out_dir = os.path.join(DATA_DIR, sign)
-    os.makedirs(out_dir, exist_ok=True)
     date = datetime.date.today().isoformat()
 
     cap = cv2.VideoCapture(args.camera)
@@ -75,6 +75,7 @@ def main():
     last_ts = -1
     seq = 0
     saved = []
+    sign = ""
 
     def step(label, color):
         """Track one new frame, show it with a banner; returns (result, key)."""
@@ -89,53 +90,68 @@ def main():
         draw(frame, result)
         frame = cv2.flip(frame, 1)
         banner(frame, label, color)
-        cv2.putText(frame, f"{sign}  take {len(saved) + 1}/{args.takes}", (20, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(frame, f"{sign}  take {min(len(saved) + 1, args.takes)}/{args.takes}", (20, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         cv2.imshow(WINDOW, frame)
         return result, cv2.waitKey(1) & 0xFF
 
-    print(f"Recording {sign}, session {args.session}: {args.takes} takes of {args.seconds}s. Keys: x = discard last, q = quit.")
+    print(f"Session {args.session}: {', '.join(args.signs)}, {args.takes} takes of {args.seconds}s each.")
+    print("Keys in the preview: Space = start next sign, x = discard last take, q = quit.")
     quit_early = False
-    while len(saved) < args.takes and not quit_early:
-        end = time.perf_counter() + args.rest
-        while time.perf_counter() < end:
-            _, key = step(f"Ready... {int(end - time.perf_counter()) + 1}", (0, 200, 255))
+    for sign in [g.upper() for g in args.signs]:
+        if quit_early:
+            break
+        out_dir = os.path.join(DATA_DIR, sign)
+        os.makedirs(out_dir, exist_ok=True)
+        saved = []
+        print(f"Next: {sign}. Press Space in the preview window when ready.")
+        while True:
+            _, key = step(f"Next: {sign} (Space)", (0, 255, 0))
+            if key == ord(" "):
+                break
             if key == ord("q"):
                 quit_early = True
                 break
-            if key == ord("x") and saved:
-                os.remove(saved.pop())
-                print(f"  discarded take, {len(saved)} kept")
-                end = time.perf_counter() + args.rest
-        if quit_early:
-            break
+        while len(saved) < args.takes and not quit_early:
+            end = time.perf_counter() + args.rest
+            while time.perf_counter() < end:
+                _, key = step(f"Ready... {int(end - time.perf_counter()) + 1}", (0, 200, 255))
+                if key == ord("q"):
+                    quit_early = True
+                    break
+                if key == ord("x") and saved:
+                    os.remove(saved.pop())
+                    print(f"  discarded take, {len(saved)} kept")
+                    end = time.perf_counter() + args.rest
+            if quit_early:
+                break
 
-        poses, lefts, rights, ts_list = [], [], [], []
-        t0 = time.perf_counter()
-        while time.perf_counter() - t0 < args.seconds:
-            result, _ = step(f"SIGN {sign} NOW", (0, 0, 255))
-            if result is None:
-                continue
-            pose, left, right = to_arrays(result)
-            poses.append(pose)
-            lefts.append(left)
-            rights.append(right)
-            ts_list.append(time.perf_counter() - t0)
+            poses, lefts, rights, ts_list = [], [], [], []
+            t0 = time.perf_counter()
+            while time.perf_counter() - t0 < args.seconds:
+                result, _ = step(f"SIGN {sign} NOW", (0, 0, 255))
+                if result is None:
+                    continue
+                pose, left, right = to_arrays(result)
+                poses.append(pose)
+                lefts.append(left)
+                rights.append(right)
+                ts_list.append(time.perf_counter() - t0)
 
-        take = len(saved) + 1
-        path = os.path.join(out_dir, f"{args.signer}_{args.session}_{date}_{take:02d}.npz")
-        while os.path.exists(path):
-            take += 1
+            take = len(saved) + 1
             path = os.path.join(out_dir, f"{args.signer}_{args.session}_{date}_{take:02d}.npz")
-        np.savez_compressed(path, pose=np.stack(poses), left=np.stack(lefts), right=np.stack(rights), t=np.array(ts_list, dtype=np.float32))
-        saved.append(path)
-        hands = np.mean([not (np.isnan(l).all() and np.isnan(r).all()) for l, r in zip(lefts, rights)])
-        print(f"  saved {os.path.basename(path)}: {len(poses)} frames, hand found in {hands:.0%}")
+            while os.path.exists(path):
+                take += 1
+                path = os.path.join(out_dir, f"{args.signer}_{args.session}_{date}_{take:02d}.npz")
+            np.savez_compressed(path, pose=np.stack(poses), left=np.stack(lefts), right=np.stack(rights), t=np.array(ts_list, dtype=np.float32))
+            saved.append(path)
+            hands = np.mean([not (np.isnan(l).all() and np.isnan(r).all()) for l, r in zip(lefts, rights)])
+            print(f"  {sign}: saved {os.path.basename(path)}: {len(poses)} frames, hand found in {hands:.0%}")
 
     landmarker.close()
     grabber.stop()
     cap.release()
     cv2.destroyAllWindows()
-    print(f"Done: {len(saved)} takes in {out_dir}")
+    print("Session finished.")
 
 
 if __name__ == "__main__":
