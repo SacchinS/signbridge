@@ -8,3 +8,5 @@ recordings/
 *.zip
 *.pt
 .DS_Store
+build/
+.build/

@@ -1,0 +1,9 @@
+# What the packaged app's engine needs (no training tools: no torch, pandas, kaggle).
+claude-agent-sdk==0.2.165
+pyobjc-core==12.2.2
+pyobjc-framework-Quartz==12.2.2
+pyobjc-framework-Cocoa==12.2.2
+pyobjc-framework-ApplicationServices==12.2.2
+mediapipe==1.1.0
+opencv-python==5.0.0.93
+numpy==2.5.4
