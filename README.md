@@ -29,15 +29,28 @@ evicts files there when the disk is low, and imports then hang waiting for iClou
 
 The intent layer calls Claude through the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/), which uses your local Claude Code login, so no API key is needed for testing.
 
+**The Mac app.** Build, install to `~/Applications` and open:
+
 ```sh
-.venv/bin/python onboard.py            # once: permissions, Siri/voice setup, camera framing, gestures
-.venv/bin/python app.py                # the app, with the live preview
-.venv/bin/python app.py --no-camera --dry-run   # keyboard stand-ins (w/c/x, 1-6), nothing is sent
-.venv/bin/python -m pytest tests       # gesture and state-machine tests
+macos/build.sh && open ~/Applications/SignBridge.app
 ```
 
-Code: `signbridge/` is the app's package (tracking, features and classifier, segmenter, gestures, state
-machine, Claude intent, routes). Spike, recording and training scripts live at the repo root; each has a
+It lives in the menu bar (hand icon). First launch opens a setup wizard: camera and Accessibility
+permissions, Claude sign-in check, Siri and voice setup, sitting position, and gesture practice. The
+preview window shows the camera with tracking, what you signed, and Claude's sentence and route.
+Engine log: `~/Library/Logs/SignBridge/engine.log`.
+
+**Developer tools:**
+
+```sh
+.venv/bin/python dev_app.py --no-camera --dry-run   # OpenCV front end; keys w/c/x and 1-6, nothing sent
+.venv/bin/python onboard.py --check                 # terminal setup checks
+.venv/bin/python -m pytest tests                    # gesture and state-machine tests
+```
+
+Code: `macos/` is the SwiftUI app; it launches the Python engine (`signbridge/server.py`) and talks JSON
+lines with it. `signbridge/` holds the engine (runtime, tracking, numpy classifier, segmenter, gestures,
+state machine, Claude intent, routes). Spike, recording and training scripts live at the repo root; each has a
 header comment explaining how to run it. Product drafts: [signs](docs/product/signs.md),
 [demo](docs/product/demo.md).
 
@@ -47,10 +60,8 @@ header comment explaining how to run it. Product drafts: [signs](docs/product/si
 - [x] Task 1: output-route spike. Siri 10/10, text 30/30, voice 5/5, Haiku 5.5 median 1.08 s ([results](docs/results/task1-routes.md))
 - [x] Task 2: tracking 29.8 fps with preview, 97.5% hand recall; 5-sign pilot ~90% on held-out sessions (97% to 79% across seeds; ~98% with PopSign pretraining) ([tracking](docs/results/task2-tracking.md), [pilot](docs/results/task2-pilot.md))
 
-- [ ] Core app: pipeline runs end to end with keyboard stand-ins and real Claude calls (dry run). Untested
-  live: gestures on camera, segmentation with the new pause rule, real routes from the app. Menu bar not built
-  yet (the preview window is the UI).
-- [ ] Onboarding: written; automatic checks pass except the camera (needs the user's terminal).
+- [ ] Mac app: builds, installs and launches; bundled engine passes Claude and fake-phrase checks. Not yet
+  walked through by a user; gestures and segmentation untested on camera.
 - [ ] "Not a command" class: code ready, PopSign downloads rate-limited by Kaggle.
 
 Measured results are recorded in [`docs/results/`](docs/results/). The original build plan is in [`docs/HANDOFF.md`](docs/HANDOFF.md).
