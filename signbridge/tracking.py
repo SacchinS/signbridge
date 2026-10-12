@@ -5,6 +5,8 @@ import threading
 import cv2
 from mediapipe.tasks.python import BaseOptions, vision
 
+from signbridge.paths import resource
+
 MODEL_PATH = "models/holistic_landmarker.task"
 WINDOW = "signbridge tracking (q to quit)"
 
@@ -16,7 +18,7 @@ def base_options(path, delegate):
 
 def make_landmarker(delegate="cpu"):
     options = vision.HolisticLandmarkerOptions(
-        base_options=base_options(MODEL_PATH, delegate),
+        base_options=base_options(resource(MODEL_PATH), delegate),
         running_mode=vision.RunningMode.VIDEO,
     )
     return vision.HolisticLandmarker.create_from_options(options)
