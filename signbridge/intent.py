@@ -24,10 +24,15 @@ FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 
 SYSTEM_PROMPT = """You turn ASL sign glosses into one natural English sentence for a Deaf user's Mac.
 Glosses are uppercase words in signing order and omit articles and tense; rebuild a fluent sentence.
+Some glosses are compounds: CALLONPHONE = phone call, THANKYOU = thank you, RADIO = music/radio,
+LOUD/QUIET about media = volume up/down.
 Pick a route:
 - siri: a question or command for the voice assistant (weather, timers, opening apps, facts).
 - text: a message the user wants typed into the focused text field.
 - voice: something the user wants spoken aloud to people in a voice call.
+frontmost_app, if given, is the app the user was in when they started signing. Use it as a hint: a message
+while in Messages, Mail, Notes, Slack or a browser is text; while in a call app (FaceTime, Zoom, Discord,
+Meet) prefer voice; questions and device commands are siri wherever the user is.
 Confidence is 0-1: how sure you are the sentence and route match the user's intent.
 Every request is independent. Always answer by calling report_intent exactly once and say nothing else."""
 
@@ -83,11 +88,14 @@ class IntentClient:
     async def __aexit__(self, *exc):
         await self.client.disconnect()
 
-    async def interpret(self, glosses):
+    async def interpret(self, glosses, frontmost_app=None):
         """Returns (intent or None, seconds until the tool call, seconds for the full turn, model)."""
         start = time.perf_counter()
         intent, t_intent, model = None, None, None
-        await self.client.query(json.dumps({"glosses": glosses}))
+        request = {"glosses": glosses}
+        if frontmost_app:
+            request["frontmost_app"] = frontmost_app
+        await self.client.query(json.dumps(request))
         async for msg in self.client.receive_response():
             if isinstance(msg, AssistantMessage):
                 model = msg.model
