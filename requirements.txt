@@ -1,0 +1,13 @@
+# Versions that passed the Task 1-2 gates (Python 3.12, Apple silicon, macOS 26).
+claude-agent-sdk==0.2.165
+pyobjc-core==12.2.2
+pyobjc-framework-Quartz==12.2.2
+pyobjc-framework-Cocoa==12.2.2
+pyobjc-framework-ApplicationServices==12.2.2
+mediapipe==1.1.0
+opencv-python==5.0.0.93
+numpy==2.5.4
+torch==2.14.1
+pandas==3.0.6
+pyarrow==26.0.0
+kaggle==2.2.4

@@ -19,14 +19,14 @@ A distinct two-part wake-sign with a timeout gates recognition, so random hand m
 Requirements: Apple silicon Mac, Python 3.12 via [uv](https://docs.astral.sh/uv/), Claude Code logged in, Camera and Accessibility permission for your terminal.
 
 ```sh
-python3 -m venv .venv
-source .venv/bin/activate
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python claude-agent-sdk pyobjc-core pyobjc-framework-Quartz \
-  pyobjc-framework-Cocoa pyobjc-framework-ApplicationServices
+uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
-The intent layer calls Claude through the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/), which uses your local Claude Code login, so no API key is needed for testing. Task 2 adds `mediapipe opencv-python torch numpy rumps`.
+Keep the repo outside iCloud-synced folders (`~/Documents`, `~/Desktop` with "Desktop & Documents" on): macOS
+evicts files there when the disk is low, and imports then hang waiting for iCloud.
+
+The intent layer calls Claude through the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/), which uses your local Claude Code login, so no API key is needed for testing.
 
 Spike scripts live at the repo root; each has a header comment explaining how to run it.
 
