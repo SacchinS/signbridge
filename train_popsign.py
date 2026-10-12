@@ -20,6 +20,7 @@ import torch
 
 from popsign_transfer import POPSIGN_DIR, SHARED, load_popsign
 from signbridge.features import featurize
+from signbridge.model import export
 from train_pilot import load_takes, predict, report, train
 
 OTHER = "OTHER"
@@ -78,6 +79,7 @@ def main():
         if saved is None:
             saved = model
     torch.save({"state_dict": saved.state_dict(), "signs": signs, "frames": args.frames, "features": x.shape[2]}, args.save)
+    export(args.save)  # .npz for the app
     print(f"\nsaved {args.save} (seed 0)")
 
 

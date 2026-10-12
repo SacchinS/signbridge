@@ -20,7 +20,8 @@ import numpy as np
 import torch
 from torch import nn
 
-from signbridge.features import TinyConv, featurize
+from signbridge.features import featurize
+from signbridge.model import TinyConv, export
 
 DATA_DIR = "data/landmarks"
 
@@ -140,6 +141,7 @@ def main():
         model = train(x, y, len(signs), args.epochs, args.seed)
         torch.save({"state_dict": model.state_dict(), "signs": signs, "frames": args.frames,
                     "features": x.shape[2]}, args.save)
+        export(args.save)  # .npz for the app
         print(f"\nsaved {args.save}")
 
 

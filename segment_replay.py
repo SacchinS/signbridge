@@ -38,7 +38,7 @@ def replay(path, classifier, seg_args, min_conf):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--model", default="models/popsign.pt")
+    p.add_argument("--model", default="models/popsign.npz")
     p.add_argument("--glob", default=f"{OUT_DIR}/*.npz")
     p.add_argument("--below", type=float, default=1.0)
     p.add_argument("--still", type=float, default=0.5)

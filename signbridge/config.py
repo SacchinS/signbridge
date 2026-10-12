@@ -6,7 +6,7 @@ import os
 PATH = os.path.expanduser("~/Library/Application Support/SignBridge/config.json")
 
 DEFAULTS = {
-    "model": "models/popsign.pt",
+    "model": "models/popsign.npz",
     "camera": 0,
     "below": 1.0,  # rest line, in shoulder widths below the shoulders (calibrated in onboarding)
     "still": 0.5,  # seconds of holding still that end a sign

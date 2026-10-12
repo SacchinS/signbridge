@@ -38,7 +38,7 @@ OTHER = "OTHER"  # the model's "not a command" class, if it has one
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--model", default="models/popsign.pt")
+    p.add_argument("--model", default="models/popsign.npz")
     p.add_argument("--free", action="store_true", help="no prompts or scoring")
     p.add_argument("--script", nargs="+", default=DEFAULT_SCRIPT, help="sequences to prompt, signs separated by spaces")
     p.add_argument("--reps", type=int, default=2)

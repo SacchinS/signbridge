@@ -1,8 +1,9 @@
-"""Landmark features and the sign classifier, shared by training scripts and the app."""
+"""Landmark features and the sign classifier, shared by training scripts and the app.
+
+Numpy only, so the app doesn't ship PyTorch. Training lives in signbridge/model.py.
+"""
 
 import numpy as np
-import torch
-from torch import nn
 
 UPPER_POSE = list(range(0, 23))  # face points, shoulders, elbows, wrists, hand points; no hips or legs
 L_SHOULDER, R_SHOULDER = 11, 12
@@ -49,19 +50,6 @@ def featurize(take, frames):
     return out.astype(np.float32)
 
 
-class TinyConv(nn.Module):
-    def __init__(self, n_features, n_classes, width=64, dropout=0.3):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv1d(n_features, width, 5, padding=2), nn.BatchNorm1d(width), nn.ReLU(), nn.Dropout(dropout),
-            nn.Conv1d(width, width, 5, padding=2), nn.BatchNorm1d(width), nn.ReLU(), nn.Dropout(dropout),
-            nn.AdaptiveAvgPool1d(1), nn.Flatten(), nn.Linear(width, n_classes),
-        )
-
-    def forward(self, x):  # x: (batch, frames, features)
-        return self.net(x.transpose(1, 2))
-
-
 def to_arrays(result):
     """One tracking result as (pose (33, 4), left (21, 3), right (21, 3)); NaN where missing."""
     pose = np.full((33, 4), np.nan, dtype=np.float32)
@@ -76,19 +64,45 @@ def to_arrays(result):
     return pose, hands[0], hands[1]
 
 
+def _conv1d(x, w, b):
+    """x (T, C_in), w (C_out, C_in, K) with 'same' padding -> (T, C_out)."""
+    k = w.shape[2]
+    xp = np.pad(x, ((k // 2, k // 2), (0, 0)))
+    windows = np.lib.stride_tricks.sliding_window_view(xp, k, axis=0)  # (T, C_in, K)
+    return np.einsum("tck,ock->to", windows, w) + b
+
+
+def _batchnorm(x, p, eps=1e-5):
+    return (x - p["running_mean"]) / np.sqrt(p["running_var"] + eps) * p["weight"] + p["bias"]
+
+
 class Classifier:
-    """A trained checkpoint (from train_pilot.py or train_popsign.py); predict() returns (label, prob)."""
+    """A trained model; predict() returns (label, prob). Loads the .npz weights written by
+    signbridge.model.export (or a training .pt checkpoint, which needs PyTorch)."""
 
     def __init__(self, path):
-        ckpt = torch.load(path, weights_only=False)
-        self.signs, self.frames = ckpt["signs"], ckpt["frames"]
-        self.model = TinyConv(ckpt["features"], len(self.signs))
-        self.model.load_state_dict(ckpt["state_dict"])
-        self.model.eval()
+        if path.endswith(".pt"):
+            from signbridge.model import checkpoint_arrays
+
+            arrays = checkpoint_arrays(path)
+        else:
+            arrays = dict(np.load(path, allow_pickle=False))
+        self.signs = [str(s) for s in arrays.pop("signs")]
+        self.frames = int(arrays.pop("frames"))
+        self.p = arrays
+
+    def _layer(self, prefix):
+        return {k[len(prefix):]: v for k, v in self.p.items() if k.startswith(prefix)}
+
+    def logits(self, x):
+        """x (frames, features) -> class scores. Same maths as TinyConv in eval mode."""
+        for conv, bn in (("net.0.", "net.1."), ("net.4.", "net.5.")):
+            x = _conv1d(x, self.p[conv + "weight"], self.p[conv + "bias"])
+            x = np.maximum(_batchnorm(x, self._layer(bn)), 0)
+        return x.mean(0) @ self.p["net.10.weight"].T + self.p["net.10.bias"]
 
     def predict(self, take):
-        x = torch.from_numpy(featurize(take, self.frames)[None])
-        with torch.no_grad():
-            probs = torch.softmax(self.model(x), 1)[0].numpy()
+        z = self.logits(featurize(take, self.frames).astype(np.float64))
+        probs = np.exp(z - z.max())
+        probs /= probs.sum()
         return self.signs[int(probs.argmax())], float(probs.max())
-
