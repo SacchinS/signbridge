@@ -63,7 +63,8 @@ struct SetupView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
-                    page.padding(28).frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 12) { page }
+                        .padding(28).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Divider()
                 HStack {
