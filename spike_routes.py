@@ -25,8 +25,8 @@ import sys
 import time
 
 import Quartz
-from ApplicationServices import AXIsProcessTrusted
 from AppKit import NSPasteboard, NSPasteboardTypeString
+from ApplicationServices import AXIsProcessTrusted
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,

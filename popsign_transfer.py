@@ -21,7 +21,8 @@ import os
 import numpy as np
 import pandas as pd
 
-from train_pilot import featurize, load_takes, predict, report, train
+from signbridge.features import featurize
+from train_pilot import load_takes, predict, report, train
 
 POPSIGN_DIR = "data/popsign"
 # my label -> PopSign label

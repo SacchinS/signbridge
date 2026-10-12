@@ -12,8 +12,9 @@ import glob
 
 import numpy as np
 
-from record_signs import Classifier
-from segment_live import OUT_DIR, Segmenter
+from segment_live import OTHER, OUT_DIR
+from signbridge.features import Classifier
+from signbridge.segment import Segmenter
 
 
 def replay(path, classifier, seg_args, min_conf):
@@ -24,7 +25,8 @@ def replay(path, classifier, seg_args, min_conf):
         for event in seg.update(f):
             if event[0] == "sign":
                 label, prob = classifier.predict(event[1])
-                glosses.append(label if prob >= min_conf else "?")
+                if label != OTHER:
+                    glosses.append(label if prob >= min_conf else "?")
             elif event[0] == "phrase":
                 phrases.append(glosses)
                 glosses = []

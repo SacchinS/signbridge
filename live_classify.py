@@ -18,8 +18,9 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-from record_signs import Classifier, banner, to_arrays
-from spike_tracking import WINDOW, LatestFrame, draw, make_landmarker
+from record_signs import banner
+from signbridge.features import Classifier, to_arrays
+from signbridge.tracking import WINDOW, LatestFrame, draw, make_landmarker
 
 
 def main():

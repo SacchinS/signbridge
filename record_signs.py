@@ -33,45 +33,11 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-from spike_tracking import WINDOW, LatestFrame, draw, make_landmarker
+from signbridge.features import Classifier, to_arrays
+from signbridge.tracking import WINDOW, LatestFrame, draw, make_landmarker
 
 DATA_DIR = "data/landmarks"
 PILOT_SIGNS = ["HELLO", "YES", "NO", "THANK-YOU", "HELP"]
-
-
-def to_arrays(result):
-    pose = np.full((33, 4), np.nan, dtype=np.float32)
-    if result.pose_landmarks:
-        pose[:] = [(lm.x, lm.y, lm.z, lm.visibility if lm.visibility is not None else np.nan) for lm in result.pose_landmarks]
-    hands = []
-    for lms in (result.left_hand_landmarks, result.right_hand_landmarks):
-        arr = np.full((21, 3), np.nan, dtype=np.float32)
-        if lms:
-            arr[:] = [(lm.x, lm.y, lm.z) for lm in lms]
-        hands.append(arr)
-    return pose, hands[0], hands[1]
-
-
-class Classifier:
-    def __init__(self, path):
-        import torch
-
-        from train_pilot import TinyConv
-
-        self.torch = torch
-        ckpt = torch.load(path, weights_only=False)
-        self.signs, self.frames = ckpt["signs"], ckpt["frames"]
-        self.model = TinyConv(ckpt["features"], len(self.signs))
-        self.model.load_state_dict(ckpt["state_dict"])
-        self.model.eval()
-
-    def predict(self, take):
-        from train_pilot import featurize
-
-        x = self.torch.from_numpy(featurize(take, self.frames)[None])
-        with self.torch.no_grad():
-            probs = self.torch.softmax(self.model(x), 1)[0].numpy()
-        return self.signs[int(probs.argmax())], float(probs.max())
 
 
 def banner(frame, text, color):

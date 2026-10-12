@@ -6,10 +6,14 @@ Needs `kaggle auth login` and the competition rules accepted on kaggle.com.
 
 Run (from the repo root, inside .venv):
     python fetch_popsign.py hello yes no thankyou [--per-sign 100]
+    python fetch_popsign.py --others 40 --per-sign 15     # random signs to train "not a command"
+
+data/popsign/subset.csv lists every downloaded sequence; new downloads are added to it.
 """
 
 import argparse
 import os
+import random
 import subprocess
 import time
 import zipfile
@@ -53,14 +57,21 @@ def fetch(path):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("signs", nargs="+", help="PopSign sign names, lower case (e.g. hello thankyou)")
+    p.add_argument("signs", nargs="*", help="PopSign sign names, lower case (e.g. hello thankyou)")
+    p.add_argument("--others", type=int, default=0, help="also fetch this many random signs not already downloaded")
     p.add_argument("--per-sign", type=int, default=100)
     p.add_argument("--workers", type=int, default=4)
     args = p.parse_args()
 
     index = pd.read_csv(os.path.join(OUT_DIR, "train.csv"))
+    subset_path = os.path.join(OUT_DIR, "subset.csv")
+    have = pd.read_csv(subset_path) if os.path.exists(subset_path) else index.iloc[:0]
+    signs = list(args.signs)
+    if args.others:
+        pool = sorted(set(index.sign) - set(have.sign) - set(signs))
+        signs += random.Random(0).sample(pool, args.others)
     chosen = []
-    for sign in args.signs:
+    for sign in signs:
         rows = pick(index, sign, args.per_sign)
         if rows.empty:
             print(f"{sign}: not in PopSign, skipped")
@@ -72,8 +83,11 @@ def main():
     with ThreadPoolExecutor(args.workers) as pool:
         results = list(pool.map(fetch, chosen.path))
     print(f"{results.count('downloaded')} downloaded, {results.count('cached')} already present, {results.count('failed')} failed")
-    chosen = chosen[[r != "failed" for r in results]]
-    chosen.drop(columns="rank").to_csv(os.path.join(OUT_DIR, "subset.csv"), index=False)
+    chosen = chosen[[r != "failed" for r in results]].drop(columns="rank")
+    merged = pd.concat([have, chosen]).drop_duplicates("path")
+    merged = merged[[os.path.exists(os.path.join(OUT_DIR, path)) for path in merged.path]]
+    merged.to_csv(subset_path, index=False)
+    print(f"subset.csv: {len(merged)} sequences, {merged.sign.nunique()} signs")
 
 
 if __name__ == "__main__":
