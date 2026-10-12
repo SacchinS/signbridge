@@ -15,9 +15,16 @@ reliable than a classifier and needs no data.
 
 | Gesture | Proposed form | Why |
 |---|---|---|
-| Wake | Both open palms to the camera, held 0.7 s | Two-hand static pose; rare by accident. The handoff asks for a distinct two-part sign with a timeout |
-| Confirm | Thumbs up, held 0.5 s | Static, unambiguous, common meaning |
-| Cancel | Open palm swiped sideways (or both fists crossed) | Clearly different from confirm |
+| Wake | Both open palms to the camera, held apart and still for 0.7 s | Two-hand static pose; rare by accident. The handoff asks for a distinct two-part sign with a timeout |
+| Confirm | Thumbs up, held still 0.5 s, other hand away | Static, unambiguous, common meaning |
+| Cancel | Thumbs down, same rules | Mirror of confirm; static, so it's as reliable |
+
+Implemented in `signbridge/gestures.py`. Checked against 6 minutes of my recorded signing (all 100 takes
+and 16 sequence attempts, 9,556 frames): 1 false trigger, a HELP take read as confirm. Before the
+stillness and separation rules there were 16 (THANK-YOU and HELP looked like wake, HELP like confirm:
+the ASL sign HELP *is* a thumbs-up on the other palm). Gestures are only listened for in the state that
+needs them (wake when idle, confirm/cancel when confirming), which limits the HELP risk further.
+Not yet tested on real gestures: needs a live session.
 
 Alternative: real ASL signs (e.g. YES / NO / FINISH). Rejected for control because YES and NO are the
 most confused pair in testing (YES -> NO, NO -> HELLO), and a misread confirm runs a command.
@@ -72,7 +79,7 @@ Legend: P = in PopSign; R = needs my recordings (20-40 takes).
 | LISTEN / HEAR | P | NOT HEAR -> "I can't hear you." |
 | NOT | P | |
 | PLEASE | P | PLEASE WAIT -> "Please wait a moment." |
-| HELP | R | HELP -> "Can someone help me?" |
+| HELP | R | HELP -> "Can someone help me?" Conflicts with the confirm gesture (it is a thumbs-up on the other palm); consider dropping |
 
 ### Routing hint (optional)
 Claude infers the route from content ("call Mom" -> Siri). If that misroutes in testing, add a route
