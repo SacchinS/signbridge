@@ -13,6 +13,7 @@ import glob
 import itertools
 import json
 import os
+import warnings
 
 import numpy as np
 
@@ -82,7 +83,8 @@ def export_take(take):
             "hands": [np.round(h[t], 2).tolist() if v[t] else None for h, v in zip(hands, visible)],
         })
     # the hand that moves most gets the motion arrow
-    with np.errstate(all="ignore"):  # a hand that never shows has no travel
+    with warnings.catch_warnings():  # a hand that never shows has no travel
+        warnings.simplefilter("ignore", RuntimeWarning)
         travel = [np.nansum(np.linalg.norm(np.diff(np.nanmean(h, 1), axis=0), axis=1)) for h in hands]
     fps = (len(take["t"]) - 1) / float(take["t"][-1] - take["t"][0])
     return frames, int(np.argmax(travel)), round(fps, 1)
