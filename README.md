@@ -38,6 +38,10 @@ macos/build.sh && open ~/Applications/SignBridge.app
 It lives in the menu bar (hand icon). First launch opens a setup wizard: camera and Accessibility
 permissions, Claude sign-in check, Siri and voice setup, sitting position, and gesture practice. The
 preview window shows the camera with tracking, what you signed, and Claude's sentence and route.
+**Demo Mode** (menu bar, or Demo in the preview) is a full-screen stage for an audience with a history of
+recent phrases; Esc leaves it. Backup keys there: W start, C send, X cancel, 1-6 test phrases.
+**Sign Guide** shows animated diagrams of each sign the model knows, drawn from recorded landmarks
+(`python export_sign_guide.py` regenerates `macos/Assets/signs.json`).
 Engine log: `~/Library/Logs/SignBridge/engine.log`.
 
 **Developer tools:**

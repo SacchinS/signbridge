@@ -1,6 +1,12 @@
 import AppKit
 import Foundation
 
+/// One finished phrase, for the demo's history.
+struct HistoryItem: Identifiable {
+    let id = UUID()
+    let glosses: [String], sentence: String, route: String, sent: Bool, date: Date
+}
+
 /// Launches the Python engine (signbridge.server) and talks JSON lines with it.
 /// Inside the app bundle it uses the bundled Python; in development it uses the repo's .venv.
 @MainActor
@@ -26,6 +32,8 @@ final class EngineClient: ObservableObject {
     @Published var checks: [String: (ok: Bool, detail: String)] = [:]
     @Published var lastCalibration: String?
     @Published var lastRouteTest: (route: String, ok: Bool, detail: String)?
+    @Published var history: [HistoryItem] = []  // newest first
+    private var pending: (glosses: [String], sentence: String, route: String)?
 
     private var process: Process?
     private var input: FileHandle?
@@ -165,7 +173,18 @@ final class EngineClient: ObservableObject {
         case "config":
             config = e["config"] as? [String: Any] ?? config
         case "status":
-            state = e["state"] as? String ?? "idle"
+            let newState = e["state"] as? String ?? "idle"
+            if newState == "confirming", let intent = e["intent"] as? [String: Any],
+               let text = intent["sentence"] as? String {
+                pending = (e["glosses"] as? [String] ?? [], text, intent["route"] as? String ?? "")
+            }
+            if newState == "idle", state == "sending" || state == "confirming", let p = pending {
+                history.insert(HistoryItem(glosses: p.glosses, sentence: p.sentence, route: p.route,
+                                           sent: state == "sending", date: Date()), at: 0)
+                history = Array(history.prefix(20))
+                pending = nil
+            }
+            state = newState
             mode = e["mode"] as? String ?? "off"
             glosses = e["glosses"] as? [String] ?? []
             let intent = e["intent"] as? [String: Any]

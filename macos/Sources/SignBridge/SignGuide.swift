@@ -37,6 +37,7 @@ private let handBones: [(Int, Int)] = [(0, 1), (1, 2), (2, 3), (3, 4), (0, 5), (
 struct SignDiagram: View {
     let sign: GuideSign
     var animate = true
+    var start = Date.distantPast  // the loop's starting moment, so a diagram can begin from its first frame
     private let hold = 0.9  // seconds to rest on the last frame before looping
 
     var body: some View {
@@ -51,7 +52,7 @@ struct SignDiagram: View {
     private func frameIndex(_ date: Date) -> Int {
         guard animate else { return sign.frames.count - 1 }
         let length = Double(sign.frames.count) / sign.fps + hold
-        let t = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: length)
+        let t = max(0, date.timeIntervalSince(start)).truncatingRemainder(dividingBy: length)
         return min(sign.frames.count - 1, Int(t * sign.fps))
     }
 

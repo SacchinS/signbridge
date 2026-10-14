@@ -4,6 +4,7 @@ import SwiftUI
 struct PreviewView: View {
     @ObservedObject var engine: EngineClient
     var showGuide: () -> Void = {}
+    var showDemo: () -> Void = {}
     private let fakePhrases: [[String]] = [["RAIN", "TOMORROW"], ["HUNGRY", "PIZZA"], ["HELLO"], ["WAIT"],
                                            ["CALLONPHONE", "MOM"], ["TIME", "NOW"]]
 
@@ -13,15 +14,15 @@ struct PreviewView: View {
         VStack(spacing: 14) {
             topBar
             ZStack(alignment: .bottom) {
-                LivePreview(engine: engine).frame(maxHeight: .infinity)
+                LivePreview(engine: engine, maxHeight: .infinity).frame(maxHeight: .infinity)
                     .overlay(RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(Brand.gradient, lineWidth: live ? 3 : 0)
                         .shadow(color: Brand.magenta.opacity(live ? 0.7 : 0), radius: 12))
                     .animation(.easeInOut(duration: 0.3), value: live)
                 if let h = engine.holding {
                     HStack(spacing: 10) {
-                        Image(systemName: gestureIcon(h.0))
-                        Text(gestureName(h.0)).bold()
+                        Image(systemName: GestureInfo.icon(h.0))
+                        Text(GestureInfo.name(h.0)).bold()
                         ProgressView(value: h.1).frame(width: 110).tint(.white)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 8)
@@ -83,7 +84,7 @@ struct PreviewView: View {
                 Text(engine.sentence ?? "").font(.system(size: 30, weight: .semibold, design: .rounded))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
-                    Label(routeText, systemImage: routeIcon).foregroundStyle(Brand.gradient).font(.headline)
+                    Label(RouteInfo.label(engine.route, target: engine.target), systemImage: RouteInfo.icon(engine.route)).foregroundStyle(Brand.gradient).font(.headline)
                     Spacer()
                     if engine.state == "confirming" {
                         Text("👍 send   👎 cancel").foregroundStyle(.secondary)
@@ -123,6 +124,8 @@ struct PreviewView: View {
             }
             Spacer()
             Button(action: showGuide) { Label("Signs", systemImage: "book") }.buttonStyle(.borderless)
+            Button(action: showDemo) { Label("Demo", systemImage: "arrow.up.left.and.arrow.down.right") }
+                .buttonStyle(.borderless)
             Menu {
                 ForEach(fakePhrases, id: \.self) { p in
                     Button(p.joined(separator: " ")) { engine.fake(p) }
@@ -133,27 +136,6 @@ struct PreviewView: View {
             .menuStyle(.borderlessButton).fixedSize()
         }
         .controlSize(.large)
-    }
-
-    private var routeText: String {
-        switch engine.route {
-        case "siri": "Ask Siri"
-        case "text": "Type into \(engine.target ?? "the active app")"
-        case "voice": "Say it in the call"
-        default: ""
-        }
-    }
-
-    private var routeIcon: String {
-        ["siri": "mic.circle.fill", "text": "keyboard", "voice": "speaker.wave.2.fill"][engine.route ?? ""] ?? "arrow.right"
-    }
-
-    private func gestureName(_ g: String) -> String {
-        ["wake": "Start", "confirm": "Send", "cancel": "Cancel"][g] ?? g.capitalized
-    }
-
-    private func gestureIcon(_ g: String) -> String {
-        ["wake": "hand.raised", "confirm": "hand.thumbsup", "cancel": "hand.thumbsdown"][g] ?? "hand.raised"
     }
 }
 

@@ -169,12 +169,6 @@ struct StatusLine: View {
 }
 
 struct WelcomePage: View {
-    private let points: [(String, String, String)] = [
-        ("hand.raised", "Open palms to start", "Show both palms to the camera, then sign and rest your hands."),
-        ("text.bubble", "Signs become a sentence", "Claude writes what you signed in plain English and shows it."),
-        ("hand.thumbsup", "You decide", "Thumbs up sends it, thumbs down cancels. Nothing goes out without you."),
-        ("lock", "Private by design", "Video never leaves this Mac. Only the recognized words go to Claude."),
-    ]
     var body: some View {
         HStack(spacing: 18) {
             Logo(size: 88)
@@ -185,18 +179,9 @@ struct WelcomePage: View {
             }
         }
         .padding(.bottom, 18)
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-            ForEach(points, id: \.1) { icon, title, text in
-                VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: icon).font(.title2).foregroundStyle(Brand.gradient)
-                    Text(title).font(.headline)
-                    Text(text).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-                .padding(14)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
+        Storyboard()
+        Label("Video never leaves this Mac. Only the recognized words go to Claude.", systemImage: "lock.fill")
+            .foregroundStyle(.secondary).padding(.top, 10)
         Text("Setup takes about 3 minutes.").foregroundStyle(.secondary).padding(.top, 14)
     }
 }
@@ -351,6 +336,7 @@ struct RouteResult: View {
 
 struct LivePreview: View {
     @ObservedObject var engine: EngineClient
+    var maxHeight: CGFloat = 340
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10).fill(.black)
@@ -377,7 +363,7 @@ struct LivePreview: View {
             }
         }
         .aspectRatio(4 / 3, contentMode: .fit)
-        .frame(maxHeight: 340)
+        .frame(maxHeight: maxHeight)
     }
 }
 

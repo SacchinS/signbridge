@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(item(listening ? "Pause SignBridge" : "Start SignBridge", #selector(toggleListening), "s"))
         menu.addItem(item("Show Preview", #selector(showPreview), "p"))
+        menu.addItem(item("Demo Mode", #selector(showDemo), "d"))
         menu.addItem(item("Sign Guide…", #selector(showGuide), "g"))
         menu.addItem(.separator())
         menu.addItem(item("Run Setup…", #selector(showSetup), ""))
@@ -76,7 +77,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !listening { startListening() }
         engine.setPreview(true)
         open("preview", title: "SignBridge", size: NSSize(width: 720, height: 600),
-             view: PreviewView(engine: engine, showGuide: { [weak self] in self?.showGuide() }), seamless: true) { [weak self] in self?.engine.setPreview(false) }
+             view: PreviewView(engine: engine, showGuide: { [weak self] in self?.showGuide() },
+                               showDemo: { [weak self] in self?.showDemo() }), seamless: true) { [weak self] in self?.engine.setPreview(false) }
         windows["preview"]?.appearance = NSAppearance(named: .darkAqua)
     }
 
@@ -90,6 +92,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
              }), seamless: true) { [weak self] in
             self?.engine.setPreview(false)
             if self?.listening == false { self?.engine.setMode("off") }
+        }
+    }
+
+    /// Full-screen stage for an audience. Esc leaves it.
+    @objc func showDemo() {
+        if !listening { startListening() }
+        engine.setPreview(true)
+        open("demo", title: "SignBridge Demo", size: NSSize(width: 1280, height: 800),
+             view: DemoView(engine: engine, exit: { [weak self] in self?.windows["demo"]?.close() }),
+             seamless: true) { [weak self] in
+            if self?.windows["preview"] == nil { self?.engine.setPreview(false) }
+        }
+        if let w = windows["demo"] {
+            w.appearance = NSAppearance(named: .darkAqua)
+            w.collectionBehavior.insert(.fullScreenPrimary)
+            if !w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil) }
         }
     }
 

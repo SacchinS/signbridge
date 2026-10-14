@@ -89,3 +89,28 @@ struct SidebarBackground: NSViewRepresentable {
     }
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
+
+/// How each output route is shown.
+enum RouteInfo {
+    static func icon(_ route: String?) -> String {
+        ["siri": "mic.circle.fill", "text": "keyboard", "voice": "speaker.wave.2.fill"][route ?? ""] ?? "arrow.right"
+    }
+    static func label(_ route: String?, target: String?) -> String {
+        switch route {
+        case "siri": "Ask Siri"
+        case "text": "Type into \(target ?? "the active app")"
+        case "voice": "Say it in the call"
+        default: ""
+        }
+    }
+}
+
+/// How each control gesture is shown.
+enum GestureInfo {
+    static func name(_ g: String) -> String {
+        ["wake": "Start", "confirm": "Send", "cancel": "Cancel"][g] ?? g.capitalized
+    }
+    static func icon(_ g: String) -> String {
+        ["wake": "hand.raised", "confirm": "hand.thumbsup", "cancel": "hand.thumbsdown"][g] ?? "hand.raised"
+    }
+}
