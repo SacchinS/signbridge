@@ -235,6 +235,8 @@ struct SiriPage: View {
     @ObservedObject var engine: EngineClient
     let done: (Bool) -> Void
     @State private var sent = false
+    @State private var trusted = AXIsProcessTrusted()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     var body: some View {
         PageHeader(title: "Siri", subtitle: "SignBridge asks Siri your questions by typing them for you.")
         VStack(alignment: .leading, spacing: 8) {
@@ -245,12 +247,18 @@ struct SiriPage: View {
             }
         }
         Divider().padding(.vertical, 12)
+        if !trusted {
+            StatusLine(ok: false, text: "Turn on Accessibility for SignBridge first (the Accessibility step).")
+        }
         Button("Ask Siri \"What time is it?\"") {
             sent = true
             engine.testRoute("siri", text: "What time is it?")
         }
         .controlSize(.large)
-        if sent {
+        .disabled(!trusted)
+        .onReceive(timer) { _ in trusted = AXIsProcessTrusted() }
+        RouteResult(engine: engine, route: "siri", okText: "Sent to Siri.")
+        if sent, engine.lastRouteTest?.ok == true {
             Text("Did Siri answer?").padding(.top, 8)
             HStack {
                 Button("Yes, it answered") { done(true) }
@@ -271,6 +279,8 @@ struct VoicePage: View {
             if r.ok {
                 Text("In your call app, choose **BlackHole 2ch** as the microphone.").padding(.top, 6)
                 Button("Play a test phrase into it") { engine.testRoute("voice", text: "SignBridge voice test.") }
+                RouteResult(engine: engine, route: "voice",
+                            okText: "Played. You won't hear it here; someone in your call would.")
             } else {
                 Text("Install the free BlackHole driver: open Terminal and run").padding(.top, 6)
                 Text("brew install blackhole-2ch").font(.body.monospaced()).textSelection(.enabled)
@@ -281,6 +291,17 @@ struct VoicePage: View {
             ProgressView().onAppear { engine.check("voice") }
         }
         Color.clear.frame(height: 1).onChange(of: engine.checks["voice"]?.ok) { _, ok in done(ok ?? false) }
+    }
+}
+
+/// The result of the last test send for one route.
+struct RouteResult: View {
+    @ObservedObject var engine: EngineClient
+    let route: String, okText: String
+    var body: some View {
+        if let r = engine.lastRouteTest, r.route == route {
+            StatusLine(ok: r.ok, text: r.ok ? okText : (r.detail.isEmpty ? "That didn't work." : r.detail))
+        }
     }
 }
 
