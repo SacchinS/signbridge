@@ -13,7 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "hand.raised", accessibilityDescription: "SignBridge")
+        statusItem.button?.image = Brand.menuBarImage(listening: false)
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -32,8 +32,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Rebuild the menu each time it opens so it shows the current state.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let state = engine.running ? (listening ? "Listening: \(engine.state)" : "Paused") : "Engine starting…"
-        menu.addItem(NSMenuItem(title: state, action: nil, keyEquivalent: ""))
+        let states = ["idle": "Watching for open palms", "listening": "Listening to your signs",
+                      "thinking": "Writing your sentence", "confirming": "Waiting for your thumbs up",
+                      "sending": "Sending"]
+        let state = engine.running ? (listening ? states[engine.state] ?? engine.state : "Paused") : "Starting…"
+        let header = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        header.attributedTitle = NSAttributedString(
+            string: "SignBridge\n", attributes: [.font: NSFont.boldSystemFont(ofSize: 13)])
+            .appending(NSAttributedString(string: state, attributes: [
+                .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor]))
+        menu.addItem(header)
         if let error = engine.engineError {
             menu.addItem(NSMenuItem(title: "⚠︎ \(error.prefix(60))", action: nil, keyEquivalent: ""))
         }
@@ -56,8 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func toggleListening() {
         listening.toggle()
         engine.setMode(listening ? "run" : "off")
-        statusItem.button?.image = NSImage(systemSymbolName: listening ? "hand.raised.fill" : "hand.raised",
-                                           accessibilityDescription: "SignBridge")
+        statusItem.button?.image = Brand.menuBarImage(listening: listening)
     }
 
     func startListening() {
@@ -68,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !listening { startListening() }
         engine.setPreview(true)
         open("preview", title: "SignBridge", size: NSSize(width: 720, height: 600),
-             view: PreviewView(engine: engine)) { [weak self] in self?.engine.setPreview(false) }
+             view: PreviewView(engine: engine), seamless: true) { [weak self] in self?.engine.setPreview(false) }
+        windows["preview"]?.appearance = NSAppearance(named: .darkAqua)
     }
 
     @objc func showSetup() {
@@ -78,20 +86,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                  self?.windows["setup"]?.close()
                  self?.startListening()
                  self?.showPreview()
-             })) { [weak self] in
+             }), seamless: true) { [weak self] in
             self?.engine.setPreview(false)
             if self?.listening == false { self?.engine.setMode("off") }
         }
     }
 
     @objc func showSettings() {
-        open("settings", title: "SignBridge Settings", size: NSSize(width: 460, height: 360),
+        open("settings", title: "SignBridge Settings", size: NSSize(width: 480, height: 470),
              view: SettingsView(engine: engine, runSetup: { [weak self] in self?.showSetup() }))
     }
 
     @objc func quit() { NSApp.terminate(nil) }
 
-    private func open<V: View>(_ key: String, title: String, size: NSSize, view: V, onClose: (() -> Void)? = nil) {
+    private func open<V: View>(_ key: String, title: String, size: NSSize, view: V, seamless: Bool = false,
+                               onClose: (() -> Void)? = nil) {
         if let w = windows[key] {
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -100,6 +109,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let w = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         w.title = title
+        if seamless {  // content runs under a transparent title bar
+            w.styleMask.insert(.fullSizeContentView)
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
+        }
         w.contentView = NSHostingView(rootView: view)
         w.isReleasedWhenClosed = false
         w.center()

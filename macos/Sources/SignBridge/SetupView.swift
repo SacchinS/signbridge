@@ -49,22 +49,41 @@ struct SetupView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            List(SetupStep.allCases, selection: Binding(get: { step }, set: { if let s = $0 { go(s) } })) { s in
-                Label {
-                    Text(s.title)
-                } icon: {
-                    Image(systemName: completed.contains(s) ? "checkmark.circle.fill" : s.icon)
-                        .foregroundStyle(completed.contains(s) ? .green : .secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    Logo(size: 38)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("SignBridge").font(.headline)
+                        Text("Setup").font(.subheadline).foregroundStyle(.secondary)
+                    }
                 }
-                .tag(s)
+                .padding(.horizontal, 16).padding(.top, 40).padding(.bottom, 6)
+                List(SetupStep.allCases, selection: Binding(get: { step }, set: { if let s = $0 { go(s) } })) { s in
+                    Label {
+                        Text(s.title)
+                    } icon: {
+                        Image(systemName: completed.contains(s) ? "checkmark.circle.fill" : s.icon)
+                            .foregroundStyle(completed.contains(s) ? .green : .secondary)
+                    }
+                    .tag(s)
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+                VStack(alignment: .leading, spacing: 6) {
+                    let total = SetupStep.allCases.count - 2
+                    let finished = completed.subtracting([.welcome, .done]).count
+                    Text("\(finished) of \(total) done").font(.caption).foregroundStyle(.secondary)
+                    ProgressView(value: Double(finished), total: Double(total)).tint(Brand.magenta)
+                }
+                .padding(16)
             }
-            .listStyle(.sidebar)
-            .frame(width: 190)
+            .frame(width: 200)
+            .background(SidebarBackground())
 
             VStack(alignment: .leading, spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) { page }
-                        .padding(28).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(28).padding(.top, 16).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Divider()
                 HStack {
@@ -75,18 +94,22 @@ struct SetupView: View {
                             engine.saveConfig(["onboarded": true])
                             finish()
                         }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
                         .keyboardShortcut(.defaultAction)
                     } else {
                         Button(completed.contains(step) || step == .welcome ? "Continue" : "Skip for now") {
                             if step == .welcome { completed.insert(.welcome) }
                             go(SetupStep(rawValue: step.rawValue + 1)!)
                         }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
                         .keyboardShortcut(.defaultAction)
                     }
                 }
                 .padding(16)
             }
         }
+        .tint(Brand.violet)
+        .ignoresSafeArea(.container, edges: .top)
         .onAppear { go(.welcome) }
     }
 
@@ -143,19 +166,35 @@ struct StatusLine: View {
 }
 
 struct WelcomePage: View {
+    private let points: [(String, String, String)] = [
+        ("hand.raised", "Open palms to start", "Show both palms to the camera, then sign and rest your hands."),
+        ("text.bubble", "Signs become a sentence", "Claude writes what you signed in plain English and shows it."),
+        ("hand.thumbsup", "You decide", "Thumbs up sends it, thumbs down cancels. Nothing goes out without you."),
+        ("lock", "Private by design", "Video never leaves this Mac. Only the recognized words go to Claude."),
+    ]
     var body: some View {
-        PageHeader(title: "Welcome to SignBridge",
-                   subtitle: "Sign ASL to your webcam to ask Siri, type messages, and speak in calls.")
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Show both open palms to start. Sign, then rest your hands.", systemImage: "hand.raised")
-            Label("SignBridge writes what you signed as a sentence and shows it to you.", systemImage: "text.bubble")
-            Label("Thumbs up sends it. Thumbs down cancels. Nothing is sent without your thumbs up.",
-                  systemImage: "hand.thumbsup")
-            Label("Your camera video never leaves this Mac. Only the recognized words are sent to Claude.",
-                  systemImage: "lock")
+        HStack(spacing: 18) {
+            Logo(size: 88)
+            VStack(alignment: .leading, spacing: 4) {
+                GradientText("SignBridge", font: .system(size: 40, weight: .bold, design: .rounded))
+                Text("Sign to your Mac. Ask Siri, type messages, speak in calls.")
+                    .font(.title3).foregroundStyle(.secondary)
+            }
         }
-        .font(.title3)
-        Text("Setup takes about 3 minutes.").foregroundStyle(.secondary).padding(.top, 20)
+        .padding(.bottom, 18)
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(points, id: \.1) { icon, title, text in
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: icon).font(.title2).foregroundStyle(Brand.gradient)
+                    Text(title).font(.headline)
+                    Text(text).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+                .padding(14)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        Text("Setup takes about 3 minutes.").foregroundStyle(.secondary).padding(.top, 14)
     }
 }
 
@@ -316,9 +355,21 @@ struct LivePreview: View {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
-                VStack {
-                    ProgressView()
-                    Text(engine.engineError ?? "Starting the camera…").foregroundStyle(.white).padding(.top, 6)
+                if let error = engine.engineError {
+                    VStack(spacing: 10) {
+                        Image(systemName: "video.slash").font(.system(size: 34)).foregroundStyle(Brand.gradient)
+                        Text(error).foregroundStyle(.white).multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if error.localizedCaseInsensitiveContains("camera") {
+                            Button("Open Camera Settings") { openSettingsPane("Privacy_Camera") }
+                        }
+                    }
+                    .padding(24)
+                } else {
+                    VStack {
+                        ProgressView()
+                        Text("Starting the camera…").foregroundStyle(.white).padding(.top, 6)
+                    }
                 }
             }
         }

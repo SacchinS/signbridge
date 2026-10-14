@@ -12,6 +12,7 @@
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>NSCameraUsageDescription</key>
     <string>SignBridge watches your hands to recognize sign language. Video stays on your Mac.</string>
 </dict>

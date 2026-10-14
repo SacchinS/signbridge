@@ -21,6 +21,12 @@ mkdir -p "$APP/Contents/MacOS" "$RES/engine" "$RES/models"
 cp macos/.build/release/SignBridge "$APP/Contents/MacOS/SignBridge"
 cp macos/Info.plist "$APP/Contents/Info.plist"
 
+echo "== Icons"
+ICONSET=$(mktemp -d)/AppIcon.iconset
+swift macos/Assets/render.swift macos/Assets/icon.svg "$ICONSET"
+iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns"
+cp macos/Assets/menubar.svg macos/Assets/menubar-on.svg "$RES/"
+
 echo "== Python runtime"
 PYHOME=$("$(uv python find 3.12)" -c "import sys; print(sys.base_prefix)")  # the real install, not uv's alias
 cp -R "$PYHOME" "$RES/python"
