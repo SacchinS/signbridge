@@ -162,6 +162,7 @@ struct WelcomePage: View {
 struct CameraPage: View {
     let done: (Bool) -> Void
     @State private var status = AVCaptureDevice.authorizationStatus(for: .video)
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     var body: some View {
         PageHeader(title: "Camera", subtitle: "SignBridge watches your hands. Video stays on your Mac.")
         switch status {
@@ -178,10 +179,11 @@ struct CameraPage: View {
             StatusLine(ok: false, text: "Camera access is off. Turn on SignBridge in Privacy & Security > Camera.")
             Button("Open Camera Settings") { openSettingsPane("Privacy_Camera") }
         }
-        Color.clear.frame(height: 1).onAppear { refresh() }
+        Color.clear.frame(height: 1).onAppear { refresh() }.onReceive(timer) { _ in refresh() }
     }
     private func refresh() {
-        status = AVCaptureDevice.authorizationStatus(for: .video)
+        let now = AVCaptureDevice.authorizationStatus(for: .video)
+        if now != status { status = now }
         done(status == .authorized)
     }
 }
