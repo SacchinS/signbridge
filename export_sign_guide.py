@@ -10,6 +10,7 @@ Run (from the repo root, inside .venv):
 """
 
 import glob
+import itertools
 import json
 import os
 
@@ -25,13 +26,13 @@ ARMS = [11, 12, 13, 14, 15, 16]  # shoulders, elbows, wrists
 MAX_GAP = 4  # hand dropouts up to this many frames are filled; longer ones mean the hand is down
 
 GUIDE = {
-    "HELLO": ("Like a salute", "Flat hand, fingers together. Start at the side of your forehead and move it "
-              "out and away from you."),
+    "HELLO": ("Like a salute", ("Flat hand, fingers together. Start at the side of your forehead and move it "
+              "out and away from you.")),
     "YES": ("A nodding fist", "Make a fist and bob it up and down at the wrist, like a head nodding yes."),
-    "NO": ("Fingers snap shut", "Hold up your index and middle fingers with your thumb, then snap them "
-           "closed onto the thumb. Once or twice."),
-    "THANK-YOU": ("From your chin, outward", "Flat hand, fingertips at your chin. Move the hand forward and "
-                  "down toward the person you're thanking."),
+    "NO": ("Fingers snap shut", ("Hold up your index and middle fingers with your thumb, then snap them "
+           "closed onto the thumb. Once or twice.")),
+    "THANK-YOU": ("From your chin, outward", ("Flat hand, fingertips at your chin. Move the hand forward and "
+                  "down toward the person you're thanking.")),
 }
 
 
@@ -40,7 +41,7 @@ def short_gaps_filled(hand):
     seen = ~np.isnan(hand).reshape(len(hand), -1).all(1)
     out = hand.copy()
     idx = np.where(seen)[0]
-    for a, b in zip(idx[:-1], idx[1:]):
+    for a, b in itertools.pairwise(idx):
         if 1 < b - a <= MAX_GAP + 1:
             for t in range(a + 1, b):
                 w = (t - a) / (b - a)
