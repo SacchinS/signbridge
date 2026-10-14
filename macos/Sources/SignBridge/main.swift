@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(item(listening ? "Pause SignBridge" : "Start SignBridge", #selector(toggleListening), "s"))
         menu.addItem(item("Show Preview", #selector(showPreview), "p"))
+        menu.addItem(item("Sign Guide…", #selector(showGuide), "g"))
         menu.addItem(.separator())
         menu.addItem(item("Run Setup…", #selector(showSetup), ""))
         menu.addItem(item("Settings…", #selector(showSettings), ","))
@@ -75,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !listening { startListening() }
         engine.setPreview(true)
         open("preview", title: "SignBridge", size: NSSize(width: 720, height: 600),
-             view: PreviewView(engine: engine), seamless: true) { [weak self] in self?.engine.setPreview(false) }
+             view: PreviewView(engine: engine, showGuide: { [weak self] in self?.showGuide() }), seamless: true) { [weak self] in self?.engine.setPreview(false) }
         windows["preview"]?.appearance = NSAppearance(named: .darkAqua)
     }
 
@@ -90,6 +91,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.engine.setPreview(false)
             if self?.listening == false { self?.engine.setMode("off") }
         }
+    }
+
+    @objc func showGuide() {
+        open("guide", title: "Sign Guide", size: NSSize(width: 640, height: 780), view: SignGuideWindow())
     }
 
     @objc func showSettings() {

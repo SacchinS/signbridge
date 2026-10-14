@@ -4,7 +4,7 @@ import AVFoundation
 import SwiftUI
 
 enum SetupStep: Int, CaseIterable, Identifiable {
-    case welcome, camera, accessibility, claude, siri, voice, framing, gestures, done
+    case welcome, camera, accessibility, claude, siri, voice, framing, gestures, signs, done
     var id: Int { rawValue }
     var title: String {
         switch self {
@@ -16,6 +16,7 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .voice: "Voice"
         case .framing: "Position"
         case .gestures: "Gestures"
+        case .signs: "Signs"
         case .done: "Done"
         }
     }
@@ -29,6 +30,7 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .voice: "speaker.wave.2"
         case .framing: "person.crop.rectangle"
         case .gestures: "hand.thumbsup"
+        case .signs: "book"
         case .done: "checkmark.seal"
         }
     }
@@ -135,6 +137,7 @@ struct SetupView: View {
         case .voice: VoicePage(engine: engine, done: { done(.voice, $0) })
         case .framing: FramingPage(engine: engine, done: { done(.framing, $0) })
         case .gestures: GesturesPage(engine: engine, done: { done(.gestures, $0) })
+        case .signs: SignsPage(done: { done(.signs, true) })
         case .done: DonePage(skipped: SetupStep.allCases.filter { ![.welcome, .done].contains($0) && !completed.contains($0) })
         }
     }
@@ -431,6 +434,16 @@ struct GesturesPage: View {
         Color.clear.frame(height: 1).onChange(of: engine.practiceTodo.isEmpty && !engine.practiceDone.isEmpty) { _, all in
             if all { done(true) }
         }
+    }
+}
+
+struct SignsPage: View {
+    let done: () -> Void
+    var body: some View {
+        PageHeader(title: "Signs to try",
+                   subtitle: "SignBridge knows these signs so far. Copy the colored hand; the arrow shows its path.")
+        SignGuideView(columns: 2).onAppear(perform: done)
+        Text("Open this guide any time from the menu bar: Sign Guide.").foregroundStyle(.secondary).padding(.top, 8)
     }
 }
 

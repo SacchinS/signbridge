@@ -3,6 +3,7 @@ import SwiftUI
 /// Live view for the user and for demos: camera with tracking, what was signed, Claude's sentence and route.
 struct PreviewView: View {
     @ObservedObject var engine: EngineClient
+    var showGuide: () -> Void = {}
     private let fakePhrases: [[String]] = [["RAIN", "TOMORROW"], ["HUNGRY", "PIZZA"], ["HELLO"], ["WAIT"],
                                            ["CALLONPHONE", "MOM"], ["TIME", "NOW"]]
 
@@ -121,6 +122,7 @@ struct PreviewView: View {
                 Button { engine.gesture("cancel") } label: { Label("Cancel", systemImage: "hand.thumbsdown") }
             }
             Spacer()
+            Button(action: showGuide) { Label("Signs", systemImage: "book") }.buttonStyle(.borderless)
             Menu {
                 ForEach(fakePhrases, id: \.self) { p in
                     Button(p.joined(separator: " ")) { engine.fake(p) }

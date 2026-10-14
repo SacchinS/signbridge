@@ -25,7 +25,7 @@ echo "== Icons"
 ICONSET=$(mktemp -d)/AppIcon.iconset
 swift macos/Assets/render.swift macos/Assets/icon.svg "$ICONSET"
 iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns"
-cp macos/Assets/menubar.svg macos/Assets/menubar-on.svg "$RES/"
+cp macos/Assets/menubar.svg macos/Assets/menubar-on.svg macos/Assets/signs.json "$RES/"
 
 echo "== Python runtime"
 PYHOME=$("$(uv python find 3.12)" -c "import sys; print(sys.base_prefix)")  # the real install, not uv's alias
